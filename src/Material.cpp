@@ -32,10 +32,16 @@ void Material::set_texture(u32 slot, std::shared_ptr<Texture> tex) {
 void Material::bind() const {
     switch(_blend_mode) {
         case BlendMode::None:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glFrontFace(GL_CCW);
+
             glDisable(GL_BLEND);
         break;
 
         case BlendMode::Alpha:
+            glDisable(GL_CULL_FACE);
+
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         break;

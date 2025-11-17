@@ -93,6 +93,35 @@ void Scene::render() const {
 
     // Render every object
     for(const SceneObject& obj : _objects) {
+
+        // Check frustum culling
+        Frustum frustum = _camera.build_frustum();
+
+        const BoundingSphere bs = obj.mesh()->bounding_sphere();
+        glm::vec3 bsWS = obj.transform() * glm::vec4(bs.center, 1.0f);
+
+        bool is_culled = false;
+
+        if (glm::dot(frustum._near_normal, bsWS - _camera.position()) < -bs.radius) {
+            is_culled = true;
+        }
+        else if (glm::dot(frustum._top_normal, bsWS - _camera.position()) < -bs.radius) {
+            is_culled = true;
+        }
+        else if (glm::dot(frustum._bottom_normal, bsWS - _camera.position()) < -bs.radius) {
+            is_culled = true;
+        }
+        else if (glm::dot(frustum._right_normal, bsWS - _camera.position()) < -bs.radius) {
+            is_culled = true;
+        }
+        else if (glm::dot(frustum._left_normal, bsWS - _camera.position()) < -bs.radius) {
+            is_culled = true;
+        }
+
+        if (is_culled) {
+            continue;
+        }
+
         obj.render();
     }
 }
