@@ -446,13 +446,26 @@ int main(int argc, char** argv) {
             PROFILE_GPU("Frame");
             glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Frame");
 
+            // Z-prepass
+            {
+                PROFILE_GPU("Z-prepass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Z-prepass");
+
+                renderer.main_framebuffer.bind(true, false);
+                // Disable color channels (this improves the performance)
+                glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+                scene->render();
+                glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+                glPopDebugGroup();
+            }
 
             // Render the scene
             {
                 PROFILE_GPU("Main pass");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Main pass");
 
-                renderer.main_framebuffer.bind(true, true);
+                renderer.main_framebuffer.bind(false, true);
                 scene->render();
 
                 glPopDebugGroup();
