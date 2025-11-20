@@ -367,9 +367,7 @@ struct RendererState {
         if(state.size.x > 0 && state.size.y > 0) {
             state.depth_texture = Texture(size, ImageFormat::Depth32_FLOAT, WrapMode::Clamp);
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
-            state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
-            state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
         }
 
         return state;
@@ -379,7 +377,6 @@ struct RendererState {
 
     Texture depth_texture;
     Texture lit_hdr_texture;
-    Texture tone_mapped_texture;
 
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
@@ -476,22 +473,11 @@ int main(int argc, char** argv) {
                 PROFILE_GPU("Tonemap");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
 
-                renderer.tone_map_framebuffer.bind(false, true);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
                 tonemap_program->bind();
                 tonemap_program->set_uniform(HASH("exposure"), exposure);
                 renderer.lit_hdr_texture.bind(0);
                 draw_full_screen_triangle();
-
-                glPopDebugGroup();
-            }
-
-            // Blit tonemap result to screen
-            {
-                PROFILE_GPU("Blit");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Blit");
-
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
-                renderer.tone_map_framebuffer.blit();
 
                 glPopDebugGroup();
             }

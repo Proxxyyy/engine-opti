@@ -12,8 +12,22 @@
 
 #include <memory>
 #include <vector>
+#include <variant>
 
 namespace OM3D {
+
+// all possible uniform types
+using UniformValue = std::variant<
+    u32,
+    float,
+    glm::vec2,
+    glm::vec3,
+    glm::vec4,
+    glm::mat2,
+    glm::mat3,
+    glm::mat4,
+    u64
+>;
 
 class Program : NonCopyable {
 
@@ -55,6 +69,8 @@ class Program : NonCopyable {
         void set_uniform(u32 name_hash, const glm::mat3& value);
         void set_uniform(u32 name_hash, const glm::mat4& value);
         void set_uniform(u32 name_hash, u64 value);
+
+        void set_uniform(u32 name_hash, const UniformValue& value);
 
         template<typename T>
         void set_uniform(std::string_view name, const T& value) {
