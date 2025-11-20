@@ -24,6 +24,8 @@ class SceneObject {
 
         const std::shared_ptr<StaticMesh>& mesh() const;
 
+        void render_depth_only(Program& program) const;
+
     private:
         glm::mat4 _transform = glm::mat4(1.0f);
 
