@@ -370,6 +370,8 @@ struct RendererState {
             state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
             state.main_framebuffer = Framebuffer(&state.depth_texture, std::array{&state.lit_hdr_texture});
             state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
+
+            state.depth_program = Program::from_files("depth.frag", "depth.vert");
         }
 
         return state;
@@ -383,6 +385,9 @@ struct RendererState {
 
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
+
+    // Add depth-only shader program
+    std::shared_ptr<Program> depth_program;
 };
 
 
@@ -452,9 +457,45 @@ int main(int argc, char** argv) {
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Z-prepass");
 
                 renderer.main_framebuffer.bind(true, false);
+
+                
+                
                 // Disable color channels (this improves the performance)
                 glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-                scene->render();
+                
+                renderer.depth_program->bind();
+    
+                // Apply the SAME frustum culling as the main pass
+                Frustum frustum = scene->camera().build_frustum();
+                
+                for(const SceneObject& obj : scene->objects()) {
+                    const BoundingSphere bs = obj.mesh()->bounding_sphere();
+                    glm::vec3 bsWS = obj.transform() * glm::vec4(bs.center, 1.0f);
+                    
+                    bool is_culled = false;
+                    
+                    if (glm::dot(frustum._near_normal, bsWS - scene->camera().position()) < -bs.radius) {
+                        is_culled = true;
+                    }
+                    else if (glm::dot(frustum._top_normal, bsWS - scene->camera().position()) < -bs.radius) {
+                        is_culled = true;
+                    }
+                    else if (glm::dot(frustum._bottom_normal, bsWS - scene->camera().position()) < -bs.radius) {
+                        is_culled = true;
+                    }
+                    else if (glm::dot(frustum._right_normal, bsWS - scene->camera().position()) < -bs.radius) {
+                        is_culled = true;
+                    }
+                    else if (glm::dot(frustum._left_normal, bsWS - scene->camera().position()) < -bs.radius) {
+                        is_culled = true;
+                    }
+                    
+                    if (!is_culled) {
+                        obj.render_depth_only(*renderer.depth_program);
+                    }
+                }
+
+                //scene->render();
                 glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
                 glPopDebugGroup();

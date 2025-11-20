@@ -31,4 +31,9 @@ const std::shared_ptr<StaticMesh>& SceneObject::mesh() const {
     return _mesh;
 }
 
+void SceneObject::render_depth_only(Program& program) const {
+    program.set_uniform(HASH("transform"), _transform);
+    _mesh->draw();
+}
+
 }
