@@ -8,6 +8,8 @@ struct CameraData {
 struct FrameData {
     CameraData camera;
 
+    mat4 light_view_proj;
+
     vec3 sun_dir;
     uint point_light_count;
 

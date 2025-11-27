@@ -31,6 +31,7 @@ uniform float alpha_cutoff;
 
 layout(binding = 4) uniform samplerCube in_envmap;
 layout(binding = 5) uniform sampler2D brdf_lut;
+layout(binding = 6) uniform sampler2D shadow_map;
 
 layout(binding = 0) uniform Data {
     FrameData frame;
@@ -67,7 +68,23 @@ void main() {
     vec3 acc = texture(in_emissive, in_uv).rgb * emissive_factor;
     acc += eval_ibl(in_envmap, brdf_lut, normal, view_dir, base_color, metallic, roughness) * frame.ibl_intensity;
     {
-        acc += frame.sun_color * eval_brdf(normal, view_dir, frame.sun_dir, base_color, metallic, roughness);
+        // Shadowing for directional sun
+        {
+            vec4 fragPosLightSpace = frame.light_view_proj * vec4(in_position, 1.0);
+            vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+            // The engine sets clip control to [0,1] for Z, so only remap X/Y from NDC [-1,1] to [0,1].
+            projCoords.xy = projCoords.xy * 0.5 + 0.5;
+
+            float shadow = 0.0;
+            if(projCoords.x >= 0.0 && projCoords.x <= 1.0 && projCoords.y >= 0.0 && projCoords.y <= 1.0 && projCoords.z >= 0.0 && projCoords.z <= 1.0) {
+                float closestDepth = texture(shadow_map, projCoords.xy).r;
+                float currentDepth = projCoords.z;
+                float bias = max(0.005 * (1.0 - dot(normal, frame.sun_dir)), 0.0005);
+                shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+            }
+
+            acc += (1.0 - shadow) * frame.sun_color * eval_brdf(normal, view_dir, frame.sun_dir, base_color, metallic, roughness);
+        }
 
         for(uint i = 0; i != frame.point_light_count; ++i) {
             PointLight light = point_lights[i];

@@ -26,6 +26,7 @@ static float sun_azimuth = 45.0f;
 static float sun_intensity = 7.0f;
 static float ibl_intensity = 1.0f;
 static float exposure = 0.33f;
+static int gbuffer_debug_mode = 2; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4=roughness
 
 static std::unique_ptr<Scene> scene;
 static std::shared_ptr<Texture> envmap;
@@ -232,6 +233,15 @@ void gui(ImGuiRenderer& imgui) {
             ImGui::EndMenu();
         }
 
+        if(ImGui::BeginMenu("G-Buffer Debug")) {
+            ImGui::RadioButton("Depth", &gbuffer_debug_mode, 0);
+            ImGui::RadioButton("Normal", &gbuffer_debug_mode, 1);
+            ImGui::RadioButton("Albedo", &gbuffer_debug_mode, 2);
+            ImGui::RadioButton("Metallic", &gbuffer_debug_mode, 3);
+            ImGui::RadioButton("Roughness", &gbuffer_debug_mode, 4);
+            ImGui::EndMenu();
+        }
+
         if(ImGui::MenuItem("GPU Profiler")) {
             open_gpu_profiler = true;
         }
@@ -380,6 +390,26 @@ struct RendererState {
             state.tone_map_framebuffer = Framebuffer(nullptr, std::array{&state.tone_mapped_texture});
 
             state.depth_program = Program::from_files("depth.frag", "basic.vert");
+
+            // G-Buffer resources (2 textures only)
+            // Texture 0: RGBA8_sRGB - RGB: albedo, A: roughness
+            state.gbuffer_albedo_roughness = Texture(size, ImageFormat::RGBA8_sRGB, WrapMode::Clamp);
+            // Texture 1: RGBA8_UNORM - RGB: normal (encoded 0-1), A: metalness
+            state.gbuffer_normal_metal = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
+            state.gbuffer_framebuffer = Framebuffer(&state.depth_texture, std::array{
+                &state.gbuffer_albedo_roughness,
+                &state.gbuffer_normal_metal
+            });
+            state.gbuffer_debug_output = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
+            state.gbuffer_debug_framebuffer = Framebuffer(nullptr, std::array{&state.gbuffer_debug_output});
+            state.gbuffer_debug_program = Program::from_files("gbuffer_debug.frag", "screen.vert");
+
+            // shadow map resources
+            const glm::uvec2 shadow_size = glm::uvec2(2048u, 2048u);
+            state.shadow_depth_texture = Texture(shadow_size, ImageFormat::Depth32_FLOAT, WrapMode::Clamp);
+            state.shadow_depth_texture.set_shadow_parameters();
+            state.shadow_framebuffer = Framebuffer(&state.shadow_depth_texture);
+            state.shadow_program = Program::from_files("shadow.frag", "shadow.vert");
         }
 
         return state;
@@ -390,6 +420,19 @@ struct RendererState {
     Texture depth_texture;
     Texture lit_hdr_texture;
     Texture tone_mapped_texture;
+
+    // Shadow map resources
+    Texture shadow_depth_texture;
+    Framebuffer shadow_framebuffer;
+    std::shared_ptr<Program> shadow_program;
+
+    // G-Buffer resources (2 textures)
+    Texture gbuffer_albedo_roughness;  // RGBA8_sRGB: RGB=albedo, A=roughness
+    Texture gbuffer_normal_metal;      // RGBA8_UNORM: RGB=normal(0-1), A=metalness
+    Framebuffer gbuffer_framebuffer;
+    Texture gbuffer_debug_output;
+    Framebuffer gbuffer_debug_framebuffer;
+    std::shared_ptr<Program> gbuffer_debug_program;
 
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
@@ -459,12 +502,12 @@ int main(int argc, char** argv) {
             PROFILE_GPU("Frame");
             glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Frame");
 
-            // Z-prepass
+            // Z-prepass (for G-Buffer)
             {
                 PROFILE_GPU("Z-prepass");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Z-prepass");
 
-                renderer.main_framebuffer.bind(true, false);
+                renderer.gbuffer_framebuffer.bind(true, false);
 
                 // Disable color channels (this improves the performance)
                 glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
@@ -475,37 +518,114 @@ int main(int argc, char** argv) {
                 glPopDebugGroup();
             }
 
-            // Render the scene
+            // G-Buffer pass
             {
-                PROFILE_GPU("Main pass");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Main pass");
+                // --- Shadow depth pass ---
+                PROFILE_GPU("Shadow pass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shadow pass");
 
-                renderer.main_framebuffer.bind(false, true);
+                // Compute light matrices from sun altitude/azimuth
+                const float alt = glm::radians(sun_altitude);
+                const float azi = glm::radians(sun_azimuth);
+                const glm::vec3 light_dir = glm::normalize(glm::vec3(sin(azi) * cos(alt), sin(alt), cos(azi) * cos(alt)));
+
+                // Position the light at some distance along direction
+                const glm::vec3 scene_center = glm::vec3(0.0f);
+                const float light_distance = 20.0f;
+                const glm::vec3 light_pos = scene_center - light_dir * light_distance;
+
+                const float ortho_size = 20.0f;
+                const glm::mat4 light_view = glm::lookAt(light_pos, scene_center, glm::vec3(0.0f, 1.0f, 0.0f));
+                const glm::mat4 light_proj = glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, 0.1f, 100.0f);
+                const glm::mat4 light_space = light_proj * light_view;
+
+                // Publish to scene for shaders
+                scene->set_light_view_proj(light_space);
+
+                // Render to shadow map
+                const glm::uvec2 shadow_size = renderer.shadow_depth_texture.size();
+                renderer.shadow_framebuffer.bind(true, false);
+                glViewport(0, 0, shadow_size.x, shadow_size.y);
+
+                // For shadow depth we use conventional depth (near=0, far=1) so clear to 1 and use LEQUAL.
+                // Save previous state to restore after pass.
+                GLint prev_depth_func = 0;
+                glGetIntegerv(GL_DEPTH_FUNC, &prev_depth_func);
+                GLdouble prev_clear_depth = 0.0;
+                glGetDoublev(GL_DEPTH_CLEAR_VALUE, &prev_clear_depth);
+
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+                glEnable(GL_DEPTH_TEST);
+                glDepthFunc(GL_LEQUAL);
+                glClearDepth(1.0);
+                glClear(GL_DEPTH_BUFFER_BIT);
+
+                renderer.shadow_program->bind();
+                renderer.shadow_program->set_uniform(HASH("lightSpaceMatrix"), light_space);
+                for(const SceneObject& obj : scene->objects()) {
+                    obj.render_depth_only(*renderer.shadow_program);
+                }
+
+                // Restore previous depth clear and func, restore viewport
+                glDepthFunc(prev_depth_func);
+                glClearDepth(prev_clear_depth);
+
+                int w = int(renderer.size.x);
+                int h = int(renderer.size.y);
+                glViewport(0, 0, w, h);
+
+                glPopDebugGroup();
+
+                PROFILE_GPU("G-Buffer pass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer pass");
+
+                renderer.gbuffer_framebuffer.bind(false, true);
+                // bind shadow map for sampling in lighting shader (kept for future)
+                renderer.shadow_depth_texture.bind(6);
                 scene->render();
 
                 glPopDebugGroup();
             }
 
-            // Apply a tonemap as a full screen pass
+            // G-Buffer debug visualization
             {
-                PROFILE_GPU("Tonemap");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
+                PROFILE_GPU("G-Buffer Debug");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer Debug");
 
-                renderer.tone_map_framebuffer.bind(false, true);
-                tonemap_program->bind();
-                tonemap_program->set_uniform(HASH("exposure"), exposure);
-                renderer.lit_hdr_texture.bind(0);
+                renderer.gbuffer_debug_framebuffer.bind(false, true);
+                renderer.gbuffer_debug_program->bind();
+                renderer.gbuffer_debug_program->set_uniform(HASH("debug_mode"), u32(gbuffer_debug_mode));
+                
+                renderer.gbuffer_albedo_roughness.bind(0);
+                renderer.gbuffer_normal_metal.bind(1);
+                renderer.depth_texture.bind(2);
+                
                 draw_full_screen_triangle();
 
                 glPopDebugGroup();
             }
 
-            // Blit tonemap result to screen
+            // Apply a tonemap as a full screen pass (kept but not used in current pipeline)
+            // {
+            //     PROFILE_GPU("Tonemap");
+            //     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
+
+            //     renderer.tone_map_framebuffer.bind(false, true);
+            //     tonemap_program->bind();
+            //     tonemap_program->set_uniform(HASH("exposure"), exposure);
+            //     renderer.lit_hdr_texture.bind(0);
+            //     draw_full_screen_triangle();
+
+            //     glPopDebugGroup();
+            // }
+
+            // Blit debug result to screen
             {
                 PROFILE_GPU("Blit");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Blit");
 
-                blit_to_screen(renderer.tone_mapped_texture);
+                blit_to_screen(renderer.gbuffer_debug_output);
                 
                 glPopDebugGroup();
             }

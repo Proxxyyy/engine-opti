@@ -54,6 +54,10 @@ void Scene::set_sun(float altitude, float azimuth, glm::vec3 color) {
     _sun_color = color;
 }
 
+void Scene::set_light_view_proj(const glm::mat4& m) {
+    _light_view_proj = m;
+}
+
 void Scene::render() const {
     // Fill and bind frame data buffer
     TypedBuffer<shader::FrameData> buffer(nullptr, 1);
@@ -62,6 +66,7 @@ void Scene::render() const {
         mapping[0].camera.view_proj = _camera.view_proj_matrix();
         mapping[0].camera.inv_view_proj = glm::inverse(_camera.view_proj_matrix());
         mapping[0].camera.position = _camera.position();
+        mapping[0].light_view_proj = _light_view_proj;
         mapping[0].point_light_count = u32(_point_lights.size());
         mapping[0].sun_color = _sun_color;
         mapping[0].sun_dir = glm::normalize(_sun_direction);

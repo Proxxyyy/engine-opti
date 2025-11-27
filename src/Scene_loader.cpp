@@ -377,7 +377,7 @@ Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
 
         const tinygltf::Mesh& mesh = gltf.meshes[node.mesh];
 
-        const std::shared_ptr<Material> default_material = std::make_shared<Material>(Material::textured_pbr_material());
+        const std::shared_ptr<Material> default_material = std::make_shared<Material>(Material::gbuffer_material());
         for(size_t j = 0; j != mesh.primitives.size(); ++j) {
             const tinygltf::Primitive& prim = mesh.primitives[j];
 
@@ -438,10 +438,11 @@ Result<std::unique_ptr<Scene>> Scene::from_gltf(const std::string& file_name) {
                     auto metal_rough = load_texture(metal_rough_info, false);
                     auto emissive = load_texture(emissive_info, false);
 
-
-                    mat = std::make_shared<Material>(Material::textured_pbr_material(alpha_test));
-
-                    if(!opaque && !mask) {
+                    // Use G-Buffer material only for opaque objects, forward rendering for transparent
+                    if(opaque || mask) {
+                        mat = std::make_shared<Material>(Material::gbuffer_material(alpha_test));
+                    } else {
+                        mat = std::make_shared<Material>(Material::textured_pbr_material(false));
                         mat->set_blend_mode(BlendMode::Alpha);
                         mat->set_depth_test_mode(DepthTestMode::None);
                     }

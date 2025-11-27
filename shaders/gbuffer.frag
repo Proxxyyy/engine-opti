@@ -1,0 +1,56 @@
+#version 450
+
+#include "utils.glsl"
+
+// G-Buffer fragment shader - outputs to 2 render targets
+
+layout(location = 0) out vec4 out_albedo_roughness; // RGB: albedo (sRGB), A: roughness
+layout(location = 1) out vec4 out_normal_metal;     // RGB: normal (encoded 0-1), A: metalness
+
+layout(location = 0) in vec3 in_normal;
+layout(location = 1) in vec2 in_uv;
+layout(location = 2) in vec3 in_color;
+layout(location = 3) in vec3 in_position;
+layout(location = 4) in vec3 in_tangent;
+layout(location = 5) in vec3 in_bitangent;
+
+layout(binding = 0) uniform sampler2D in_texture;
+layout(binding = 1) uniform sampler2D in_normal_texture;
+layout(binding = 2) uniform sampler2D in_metal_rough;
+layout(binding = 3) uniform sampler2D in_emissive;
+
+uniform vec3 base_color_factor;
+uniform vec2 metal_rough_factor;
+uniform vec3 emissive_factor;
+uniform float alpha_cutoff;
+
+void main() {
+    // Compute world-space normal from normal map
+    const vec3 normal_map = unpack_normal_map(texture(in_normal_texture, in_uv).xy);
+    const vec3 normal = normal_map.x * in_tangent +
+                        normal_map.y * in_bitangent +
+                        normal_map.z * in_normal;
+
+    // Sample textures
+    const vec4 albedo_tex = texture(in_texture, in_uv);
+    const vec3 base_color = in_color.rgb * albedo_tex.rgb * base_color_factor;
+    const float alpha = albedo_tex.a;
+
+#ifdef ALPHA_TEST
+    if(alpha <= alpha_cutoff) {
+        discard;
+    }
+#endif
+
+    const vec4 metal_rough_tex = texture(in_metal_rough, in_uv);
+    const float roughness = metal_rough_tex.g * metal_rough_factor.y;
+    const float metallic = metal_rough_tex.b * metal_rough_factor.x;
+
+    // Write to G-Buffer
+    // Texture 0: Albedo (RGB) + Roughness (A) - RGBA8_sRGB
+    out_albedo_roughness = vec4(base_color, roughness);
+    
+    // Texture 1: Normal (RGB, encoded from [-1,1] to [0,1]) + Metalness (A) - RGBA8_UNORM
+    vec3 encoded_normal = normalize(normal) * 0.5 + 0.5;
+    out_normal_metal = vec4(encoded_normal, metallic);
+}

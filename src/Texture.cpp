@@ -141,6 +141,18 @@ void Texture::bind_as_image(u32 index, AccessType access) {
     glBindImageTexture(index, _handle.get(), 0, texture_type() != GL_TEXTURE_2D, 0, access_type_to_gl(access), image_format_to_gl(_format).internal_format);
 }
 
+void Texture::set_shadow_parameters() {
+    if (!_handle.is_valid()) return;
+    // nearest filtering for depth map (avoid leaking) as default;
+    glTextureParameteri(_handle.get(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(_handle.get(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // clamp to border and make outside areas lit
+    glTextureParameteri(_handle.get(), GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTextureParameteri(_handle.get(), GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glTextureParameterfv(_handle.get(), GL_TEXTURE_BORDER_COLOR, borderColor);
+}
+
 u64 Texture::bindless_handle() const {
     return _bindless;
 }

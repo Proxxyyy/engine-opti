@@ -49,6 +49,9 @@ class Texture {
         void bind(u32 index) const;
         void bind_as_image(u32 index, AccessType access);
 
+        // configure parameters appropriate for a depth/shadow texture
+        void set_shadow_parameters();
+
         u64 bindless_handle() const;
 
         u32 texture_type() const;
