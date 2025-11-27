@@ -391,10 +391,7 @@ struct RendererState {
 
             state.depth_program = Program::from_files("depth.frag", "basic.vert");
 
-            // G-Buffer resources (2 textures only)
-            // Texture 0: RGBA8_sRGB - RGB: albedo, A: roughness
             state.gbuffer_albedo_roughness = Texture(size, ImageFormat::RGBA8_sRGB, WrapMode::Clamp);
-            // Texture 1: RGBA8_UNORM - RGB: normal (encoded 0-1), A: metalness
             state.gbuffer_normal_metal = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
             state.gbuffer_framebuffer = Framebuffer(&state.depth_texture, std::array{
                 &state.gbuffer_albedo_roughness,
@@ -427,8 +424,8 @@ struct RendererState {
     std::shared_ptr<Program> shadow_program;
 
     // G-Buffer resources (2 textures)
-    Texture gbuffer_albedo_roughness;  // RGBA8_sRGB: RGB=albedo, A=roughness
-    Texture gbuffer_normal_metal;      // RGBA8_UNORM: RGB=normal(0-1), A=metalness
+    Texture gbuffer_albedo_roughness;
+    Texture gbuffer_normal_metal;
     Framebuffer gbuffer_framebuffer;
     Texture gbuffer_debug_output;
     Framebuffer gbuffer_debug_framebuffer;
@@ -524,15 +521,13 @@ int main(int argc, char** argv) {
                 PROFILE_GPU("Shadow pass");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shadow pass");
 
-                // Compute light matrices from sun altitude/azimuth
                 const float alt = glm::radians(sun_altitude);
                 const float azi = glm::radians(sun_azimuth);
                 const glm::vec3 light_dir = glm::normalize(glm::vec3(sin(azi) * cos(alt), sin(alt), cos(azi) * cos(alt)));
 
                 // Position the light at some distance along direction
                 const glm::vec3 scene_center = glm::vec3(0.0f);
-                const float light_distance = 20.0f;
-                const glm::vec3 light_pos = scene_center - light_dir * light_distance;
+                const glm::vec3 light_pos = scene_center - light_dir * sun_altitude;
 
                 const float ortho_size = 20.0f;
                 const glm::mat4 light_view = glm::lookAt(light_pos, scene_center, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -547,8 +542,6 @@ int main(int argc, char** argv) {
                 renderer.shadow_framebuffer.bind(true, false);
                 glViewport(0, 0, shadow_size.x, shadow_size.y);
 
-                // For shadow depth we use conventional depth (near=0, far=1) so clear to 1 and use LEQUAL.
-                // Save previous state to restore after pass.
                 GLint prev_depth_func = 0;
                 glGetIntegerv(GL_DEPTH_FUNC, &prev_depth_func);
                 GLdouble prev_clear_depth = 0.0;
@@ -567,7 +560,6 @@ int main(int argc, char** argv) {
                     obj.render_depth_only(*renderer.shadow_program);
                 }
 
-                // Restore previous depth clear and func, restore viewport
                 glDepthFunc(prev_depth_func);
                 glClearDepth(prev_clear_depth);
 
@@ -581,14 +573,12 @@ int main(int argc, char** argv) {
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer pass");
 
                 renderer.gbuffer_framebuffer.bind(false, true);
-                // bind shadow map for sampling in lighting shader (kept for future)
                 renderer.shadow_depth_texture.bind(6);
                 scene->render();
 
                 glPopDebugGroup();
             }
 
-            // G-Buffer debug visualization
             {
                 PROFILE_GPU("G-Buffer Debug");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer Debug");

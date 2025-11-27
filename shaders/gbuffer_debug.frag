@@ -1,7 +1,5 @@
 #version 450
 
-// Debug visualization shader for G-Buffer contents
-
 layout(location = 0) out vec4 out_color;
 
 layout(binding = 0) uniform sampler2D gbuffer_albedo_roughness;  // RGBA8_sRGB
@@ -24,23 +22,22 @@ void main() {
     vec3 encoded_normal = normal_metal.rgb;
     float metalness = normal_metal.a;
     
-    // Decode normal from [0,1] to [-1,1]
     vec3 normal = encoded_normal * 2.0 - 1.0;
     
     switch(debug_mode) {
-        case 0u: // Depth (visualized)
+        case 0u:
             out_color = vec4(vec3(pow(depth, 0.35)), 1.0);
             break;
-        case 1u: // Normal (decode and remap for visualization)
+        case 1u:
             out_color = vec4(normal * 0.5 + 0.5, 1.0);
             break;
-        case 2u: // Albedo
+        case 2u:
             out_color = vec4(albedo, 1.0);
             break;
-        case 3u: // Metallic
+        case 3u:
             out_color = vec4(vec3(metalness), 1.0);
             break;
-        case 4u: // Roughness
+        case 4u:
             out_color = vec4(vec3(roughness), 1.0);
             break;
         default:
