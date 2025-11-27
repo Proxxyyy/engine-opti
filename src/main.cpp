@@ -26,7 +26,7 @@ static float sun_azimuth = 45.0f;
 static float sun_intensity = 7.0f;
 static float ibl_intensity = 1.0f;
 static float exposure = 0.33f;
-static int gbuffer_debug_mode = 2; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4=roughness
+// static int gbuffer_debug_mode = 2; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4=roughness
 
 static std::unique_ptr<Scene> scene;
 static std::shared_ptr<Texture> envmap;
@@ -233,14 +233,15 @@ void gui(ImGuiRenderer& imgui) {
             ImGui::EndMenu();
         }
 
-        if(ImGui::BeginMenu("G-Buffer Debug")) {
-            ImGui::RadioButton("Depth", &gbuffer_debug_mode, 0);
-            ImGui::RadioButton("Normal", &gbuffer_debug_mode, 1);
-            ImGui::RadioButton("Albedo", &gbuffer_debug_mode, 2);
-            ImGui::RadioButton("Metallic", &gbuffer_debug_mode, 3);
-            ImGui::RadioButton("Roughness", &gbuffer_debug_mode, 4);
-            ImGui::EndMenu();
-        }
+        // G-Buffer Debug menu (commented out for shadow work)
+        // if(ImGui::BeginMenu("G-Buffer Debug")) {
+        //     ImGui::RadioButton("Depth", &gbuffer_debug_mode, 0);
+        //     ImGui::RadioButton("Normal", &gbuffer_debug_mode, 1);
+        //     ImGui::RadioButton("Albedo", &gbuffer_debug_mode, 2);
+        //     ImGui::RadioButton("Metallic", &gbuffer_debug_mode, 3);
+        //     ImGui::RadioButton("Roughness", &gbuffer_debug_mode, 4);
+        //     ImGui::EndMenu();
+        // }
 
         if(ImGui::MenuItem("GPU Profiler")) {
             open_gpu_profiler = true;
@@ -391,15 +392,16 @@ struct RendererState {
 
             state.depth_program = Program::from_files("depth.frag", "basic.vert");
 
-            state.gbuffer_albedo_roughness = Texture(size, ImageFormat::RGBA8_sRGB, WrapMode::Clamp);
-            state.gbuffer_normal_metal = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
-            state.gbuffer_framebuffer = Framebuffer(&state.depth_texture, std::array{
-                &state.gbuffer_albedo_roughness,
-                &state.gbuffer_normal_metal
-            });
-            state.gbuffer_debug_output = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
-            state.gbuffer_debug_framebuffer = Framebuffer(nullptr, std::array{&state.gbuffer_debug_output});
-            state.gbuffer_debug_program = Program::from_files("gbuffer_debug.frag", "screen.vert");
+            // G-Buffer resources (commented out for shadow work)
+            // state.gbuffer_albedo_roughness = Texture(size, ImageFormat::RGBA8_sRGB, WrapMode::Clamp);
+            // state.gbuffer_normal_metal = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
+            // state.gbuffer_framebuffer = Framebuffer(&state.depth_texture, std::array{
+            //     &state.gbuffer_albedo_roughness,
+            //     &state.gbuffer_normal_metal
+            // });
+            // state.gbuffer_debug_output = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
+            // state.gbuffer_debug_framebuffer = Framebuffer(nullptr, std::array{&state.gbuffer_debug_output});
+            // state.gbuffer_debug_program = Program::from_files("gbuffer_debug.frag", "screen.vert");
 
             // shadow map resources
             const glm::uvec2 shadow_size = glm::uvec2(2048u, 2048u);
@@ -423,13 +425,13 @@ struct RendererState {
     Framebuffer shadow_framebuffer;
     std::shared_ptr<Program> shadow_program;
 
-    // G-Buffer resources (2 textures)
-    Texture gbuffer_albedo_roughness;
-    Texture gbuffer_normal_metal;
-    Framebuffer gbuffer_framebuffer;
-    Texture gbuffer_debug_output;
-    Framebuffer gbuffer_debug_framebuffer;
-    std::shared_ptr<Program> gbuffer_debug_program;
+    // G-Buffer resources (2 textures) - commented out for shadow work
+    // Texture gbuffer_albedo_roughness;
+    // Texture gbuffer_normal_metal;
+    // Framebuffer gbuffer_framebuffer;
+    // Texture gbuffer_debug_output;
+    // Framebuffer gbuffer_debug_framebuffer;
+    // std::shared_ptr<Program> gbuffer_debug_program;
 
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
@@ -499,12 +501,12 @@ int main(int argc, char** argv) {
             PROFILE_GPU("Frame");
             glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Frame");
 
-            // Z-prepass (for G-Buffer)
+            // Z-prepass
             {
                 PROFILE_GPU("Z-prepass");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Z-prepass");
 
-                renderer.gbuffer_framebuffer.bind(true, false);
+                renderer.main_framebuffer.bind(true, false);
 
                 // Disable color channels (this improves the performance)
                 glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
@@ -568,54 +570,41 @@ int main(int argc, char** argv) {
                 glViewport(0, 0, w, h);
 
                 glPopDebugGroup();
+            }
 
-                PROFILE_GPU("G-Buffer pass");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer pass");
+            // Main pass (forward rendering)
+            {
+                PROFILE_GPU("Main pass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Main pass");
 
-                renderer.gbuffer_framebuffer.bind(false, true);
+                renderer.main_framebuffer.bind(false, true);
+                // bind shadow map for sampling in lighting shader
                 renderer.shadow_depth_texture.bind(6);
                 scene->render();
 
                 glPopDebugGroup();
             }
 
+            // Apply a tonemap as a full screen pass
             {
-                PROFILE_GPU("G-Buffer Debug");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer Debug");
+                PROFILE_GPU("Tonemap");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
 
-                renderer.gbuffer_debug_framebuffer.bind(false, true);
-                renderer.gbuffer_debug_program->bind();
-                renderer.gbuffer_debug_program->set_uniform(HASH("debug_mode"), u32(gbuffer_debug_mode));
-                
-                renderer.gbuffer_albedo_roughness.bind(0);
-                renderer.gbuffer_normal_metal.bind(1);
-                renderer.depth_texture.bind(2);
-                
+                renderer.tone_map_framebuffer.bind(false, true);
+                tonemap_program->bind();
+                tonemap_program->set_uniform(HASH("exposure"), exposure);
+                renderer.lit_hdr_texture.bind(0);
                 draw_full_screen_triangle();
 
                 glPopDebugGroup();
             }
 
-            // Apply a tonemap as a full screen pass (kept but not used in current pipeline)
-            // {
-            //     PROFILE_GPU("Tonemap");
-            //     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
-
-            //     renderer.tone_map_framebuffer.bind(false, true);
-            //     tonemap_program->bind();
-            //     tonemap_program->set_uniform(HASH("exposure"), exposure);
-            //     renderer.lit_hdr_texture.bind(0);
-            //     draw_full_screen_triangle();
-
-            //     glPopDebugGroup();
-            // }
-
-            // Blit debug result to screen
+            // Blit tonemap result to screen
             {
                 PROFILE_GPU("Blit");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Blit");
 
-                blit_to_screen(renderer.gbuffer_debug_output);
+                blit_to_screen(renderer.tone_mapped_texture);
                 
                 glPopDebugGroup();
             }
