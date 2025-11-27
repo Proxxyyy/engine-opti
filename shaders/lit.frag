@@ -72,7 +72,6 @@ void main() {
         {
             vec4 fragPosLightSpace = frame.light_view_proj * vec4(in_position, 1.0);
             vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-            // The engine sets clip control to [0,1] for Z, so only remap X/Y from NDC [-1,1] to [0,1].
             projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
             float shadow = 0.0;
