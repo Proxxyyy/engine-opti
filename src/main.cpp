@@ -531,7 +531,7 @@ int main(int argc, char** argv) {
                 const glm::vec3 scene_center = glm::vec3(0.0f);
                 const glm::vec3 light_pos = scene_center - light_dir * sun_altitude;
 
-                const float ortho_size = 20.0f;
+                const float ortho_size = 10.0f;
                 const glm::mat4 light_view = glm::lookAt(light_pos, scene_center, glm::vec3(0.0f, 1.0f, 0.0f));
                 const glm::mat4 light_proj = glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, 0.1f, 100.0f);
                 const glm::mat4 light_space = light_proj * light_view;
@@ -544,27 +544,11 @@ int main(int argc, char** argv) {
                 renderer.shadow_framebuffer.bind(true, false);
                 glViewport(0, 0, shadow_size.x, shadow_size.y);
 
-                GLint prev_depth_func = 0;
-                glGetIntegerv(GL_DEPTH_FUNC, &prev_depth_func);
-                GLdouble prev_clear_depth = 0.0;
-                glGetDoublev(GL_DEPTH_CLEAR_VALUE, &prev_clear_depth);
-
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glEnable(GL_DEPTH_TEST);
-                glDepthFunc(GL_LEQUAL);
-                glClearDepth(1.0);
-                glClear(GL_DEPTH_BUFFER_BIT);
-
                 renderer.shadow_program->bind();
                 renderer.shadow_program->set_uniform(HASH("lightSpaceMatrix"), light_space);
                 for(const SceneObject& obj : scene->objects()) {
                     obj.render_depth_only(*renderer.shadow_program);
                 }
-
-                glDepthFunc(prev_depth_func);
-                glClearDepth(prev_clear_depth);
-
                 int w = int(renderer.size.x);
                 int h = int(renderer.size.y);
                 glViewport(0, 0, w, h);
