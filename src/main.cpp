@@ -423,7 +423,6 @@ struct RendererState {
     Framebuffer shadow_framebuffer;
     std::shared_ptr<Program> shadow_program;
 
-    // G-Buffer resources (2 textures)
     Texture gbuffer_albedo_roughness;
     Texture gbuffer_normal_metal;
     Framebuffer gbuffer_framebuffer;
@@ -434,7 +433,6 @@ struct RendererState {
     Framebuffer main_framebuffer;
     Framebuffer tone_map_framebuffer;
 
-    // Add depth-only shader program
     std::shared_ptr<Program> depth_program;
 };
 
@@ -525,7 +523,6 @@ int main(int argc, char** argv) {
                 const float azi = glm::radians(sun_azimuth);
                 const glm::vec3 light_dir = glm::normalize(glm::vec3(sin(azi) * cos(alt), sin(alt), cos(azi) * cos(alt)));
 
-                // Position the light at some distance along direction
                 const glm::vec3 scene_center = glm::vec3(0.0f);
                 const glm::vec3 light_pos = scene_center - light_dir * sun_altitude;
 
@@ -534,10 +531,8 @@ int main(int argc, char** argv) {
                 const glm::mat4 light_proj = glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, 0.1f, 100.0f);
                 const glm::mat4 light_space = light_proj * light_view;
 
-                // Publish to scene for shaders
                 scene->set_light_view_proj(light_space);
 
-                // Render to shadow map
                 const glm::uvec2 shadow_size = renderer.shadow_depth_texture.size();
                 renderer.shadow_framebuffer.bind(true, false);
                 glViewport(0, 0, shadow_size.x, shadow_size.y);
