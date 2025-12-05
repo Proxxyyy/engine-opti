@@ -2,8 +2,6 @@
 
 #include <TypedBuffer.h>
 
-#include <shader_structs.h>
-
 namespace OM3D {
 
 Scene::Scene() {
@@ -58,7 +56,7 @@ void Scene::set_light_view_proj(const glm::mat4& m) {
     _light_view_proj = m;
 }
 
-void Scene::render() const {
+void Scene::bind_buffer() const {
     // Fill and bind frame data buffer
     TypedBuffer<shader::FrameData> buffer(nullptr, 1);
     {
@@ -73,6 +71,17 @@ void Scene::render() const {
         mapping[0].ibl_intensity = _ibl_intensity;
     }
     buffer.bind(BufferUsage::Uniform, 0);
+
+    // Bind envmap
+    DEBUG_ASSERT(_envmap && !_envmap->is_null());
+    _envmap->bind(4);
+
+    // Bind brdf lut needed for lighting to scene rendering shaders
+    brdf_lut().bind(5);
+}
+
+void Scene::render() const {
+    bind_buffer();
 
     // Fill and bind lights buffer
     TypedBuffer<shader::PointLight> light_buffer(nullptr, std::max(_point_lights.size(), size_t(1)));
@@ -89,13 +98,6 @@ void Scene::render() const {
         }
     }
     light_buffer.bind(BufferUsage::Storage, 1);
-
-    // Bind envmap
-    DEBUG_ASSERT(_envmap && !_envmap->is_null());
-    _envmap->bind(4);
-
-    // Bind brdf lut needed for lighting to scene rendering shaders
-    brdf_lut().bind(5);
 
     // Render the sky
     _sky_material.bind();

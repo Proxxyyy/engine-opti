@@ -4,6 +4,7 @@
 #include <SceneObject.h>
 #include <PointLight.h>
 #include <Camera.h>
+#include <shader_structs.h>
 
 #include <vector>
 #include <memory>
@@ -17,6 +18,7 @@ class Scene : NonMovable {
 
         static Result<std::unique_ptr<Scene>> from_gltf(const std::string& file_name);
 
+        void bind_buffer() const;
         void render() const;
 
         void add_object(SceneObject obj);

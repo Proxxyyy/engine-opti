@@ -407,6 +407,10 @@ struct RendererState {
             state.shadow_depth_texture.set_shadow_parameters();
             state.shadow_framebuffer = Framebuffer(&state.shadow_depth_texture);
             state.shadow_program = Program::from_files("shadow.frag", "shadow.vert");
+
+            state.scene_shading_program = Program::from_files("scene.frag", "screen.vert");
+
+            state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
         }
 
         return state;
@@ -434,11 +438,11 @@ struct RendererState {
     Framebuffer tone_map_framebuffer;
 
     std::shared_ptr<Program> depth_program;
+
+    Framebuffer shading_framebuffer;
+    std::shared_ptr<Program> scene_shading_program;
+    std::shared_ptr<Program> pl_shading_program;
 };
-
-
-
-
 
 int main(int argc, char** argv) {
     DEBUG_ASSERT([] { std::cout << "Debug asserts enabled" << std::endl; return true; }());
@@ -590,6 +594,28 @@ int main(int argc, char** argv) {
 
                 glPopDebugGroup();
             }
+
+            /*{
+                PROFILE_GPU("Shading Pass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shading Pass");
+
+                renderer.shading_framebuffer.bind(false, true);
+                renderer.scene_shading_program->bind();
+
+                renderer.gbuffer_albedo_roughness.bind(0);
+                renderer.gbuffer_normal_metal.bind(1);
+                scene->bind_buffer(); // bind frame data buffer
+                
+                draw_full_screen_triangle();
+
+                // material ??? blend et tt
+
+                renderer.pl_shading_program->bind();
+
+                draw_full_screen_triangle();
+
+                glPopDebugGroup();
+            }*/
 
             // Apply a tonemap as a full screen pass (kept but not used in current pipeline)
             // {
