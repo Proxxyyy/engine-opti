@@ -6,12 +6,12 @@ layout(binding = 0) uniform sampler2D gbuffer_albedo_roughness;  // RGBA8_sRGB
 layout(binding = 1) uniform sampler2D gbuffer_normal_metal;      // RGBA8_UNORM
 layout(binding = 2) uniform sampler2D gbuffer_depth;             // Depth32F
 
-in vec2 v_uv;
+layout(location = 0) in vec2 in_uv;
 
 uniform uint debug_mode; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4=roughness
 
 void main() {
-    vec2 uv = gl_FragCoord.xy / vec2(textureSize(gbuffer_albedo_roughness, 0));
+    vec2 uv = in_uv;
     
     vec4 albedo_roughness = texture(gbuffer_albedo_roughness, uv);
     vec4 normal_metal = texture(gbuffer_normal_metal, uv);

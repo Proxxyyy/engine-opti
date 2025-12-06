@@ -401,6 +401,9 @@ struct RendererState {
             state.gbuffer_debug_framebuffer = Framebuffer(nullptr, std::array{&state.gbuffer_debug_output});
             state.gbuffer_debug_program = Program::from_files("gbuffer_debug.frag", "screen.vert");
 
+            // Shading framebuffer outputs to lit_hdr_texture
+            state.shading_framebuffer = Framebuffer(nullptr, std::array{&state.lit_hdr_texture});
+
             // shadow map resources
             const glm::uvec2 shadow_size = glm::uvec2(2048u, 2048u);
             state.shadow_depth_texture = Texture(shadow_size, ImageFormat::Depth32_FLOAT, WrapMode::Clamp);
@@ -410,7 +413,7 @@ struct RendererState {
 
             state.scene_shading_program = Program::from_files("scene.frag", "screen.vert");
 
-            state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
+            //state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
         }
 
         return state;
@@ -578,7 +581,7 @@ int main(int argc, char** argv) {
                 glPopDebugGroup();
             }
 
-            {
+            /*{
                 PROFILE_GPU("G-Buffer Debug");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer Debug");
 
@@ -595,7 +598,7 @@ int main(int argc, char** argv) {
                 glPopDebugGroup();
             }
 
-            /*{
+            */{
                 PROFILE_GPU("Shading Pass");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shading Pass");
 
@@ -604,39 +607,40 @@ int main(int argc, char** argv) {
 
                 renderer.gbuffer_albedo_roughness.bind(0);
                 renderer.gbuffer_normal_metal.bind(1);
+                renderer.depth_texture.bind(2);
                 scene->bind_buffer(); // bind frame data buffer
                 
                 draw_full_screen_triangle();
 
                 // material ??? blend et tt
 
-                renderer.pl_shading_program->bind();
+                //renderer.pl_shading_program->bind();
 
+                //draw_full_screen_triangle();
+
+                glPopDebugGroup();
+            }
+
+            //Apply a tonemap as a full screen pass (kept but not used in current pipeline)
+            {
+                PROFILE_GPU("Tonemap");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
+
+                renderer.tone_map_framebuffer.bind(false, true);
+                tonemap_program->bind();
+                tonemap_program->set_uniform(HASH("exposure"), exposure);
+                renderer.lit_hdr_texture.bind(0);
                 draw_full_screen_triangle();
 
                 glPopDebugGroup();
-            }*/
-
-            // Apply a tonemap as a full screen pass (kept but not used in current pipeline)
-            // {
-            //     PROFILE_GPU("Tonemap");
-            //     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
-
-            //     renderer.tone_map_framebuffer.bind(false, true);
-            //     tonemap_program->bind();
-            //     tonemap_program->set_uniform(HASH("exposure"), exposure);
-            //     renderer.lit_hdr_texture.bind(0);
-            //     draw_full_screen_triangle();
-
-            //     glPopDebugGroup();
-            // }
+            }
 
             // Blit debug result to screen
             {
                 PROFILE_GPU("Blit");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Blit");
 
-                blit_to_screen(renderer.gbuffer_debug_output);
+                blit_to_screen(renderer.tone_mapped_texture);
                 
                 glPopDebugGroup();
             }
