@@ -5,6 +5,7 @@
 #include <PointLight.h>
 #include <Camera.h>
 #include <shader_structs.h>
+#include <TypedBuffer.h>
 
 #include <vector>
 #include <memory>
@@ -19,6 +20,7 @@ class Scene : NonMovable {
         static Result<std::unique_ptr<Scene>> from_gltf(const std::string& file_name);
 
         void bind_buffer() const;
+        void bind_buffer_pl() const;
         void render() const;
 
         void add_object(SceneObject obj);
@@ -40,6 +42,9 @@ class Scene : NonMovable {
     private:
         std::vector<SceneObject> _objects;
         std::vector<PointLight> _point_lights;
+
+        mutable std::unique_ptr<TypedBuffer<shader::FrameData>> _frame_data_buffer;
+        mutable std::unique_ptr<TypedBuffer<shader::PointLight>> _point_light_buffer;
 
         glm::vec3 _sun_direction = glm::vec3(0.2f, 1.0f, 0.1f);
         glm::vec3 _sun_color = glm::vec3(1.0f);

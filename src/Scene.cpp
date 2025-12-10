@@ -57,10 +57,12 @@ void Scene::set_light_view_proj(const glm::mat4& m) {
 }
 
 void Scene::bind_buffer() const {
-    // Fill and bind frame data buffer
-    TypedBuffer<shader::FrameData> buffer(nullptr, 1);
+    if(!_frame_data_buffer) {
+        _frame_data_buffer = std::make_unique<TypedBuffer<shader::FrameData>>(nullptr, 1);
+    }
+
     {
-        auto mapping = buffer.map(AccessType::WriteOnly);
+        auto mapping = _frame_data_buffer->map(AccessType::WriteOnly);
         mapping[0].camera.view_proj = _camera.view_proj_matrix();
         mapping[0].camera.inv_view_proj = glm::inverse(_camera.view_proj_matrix());
         mapping[0].camera.position = _camera.position();
@@ -70,7 +72,8 @@ void Scene::bind_buffer() const {
         mapping[0].sun_dir = glm::normalize(_sun_direction);
         mapping[0].ibl_intensity = _ibl_intensity;
     }
-    buffer.bind(BufferUsage::Uniform, 0);
+    
+    _frame_data_buffer->bind(BufferUsage::Uniform, 0);
 
     // Bind envmap
     DEBUG_ASSERT(_envmap && !_envmap->is_null());
@@ -80,13 +83,14 @@ void Scene::bind_buffer() const {
     brdf_lut().bind(5);
 }
 
-void Scene::render() const {
-    bind_buffer();
+void Scene::bind_buffer_pl() const {
+    if(!_point_light_buffer) {
+        // std::max with 1 to prevent error if 0 point light in the scene
+        _point_light_buffer = std::make_unique<TypedBuffer<shader::PointLight>>(nullptr, std::max(_point_lights.size(), size_t(1)));
+    }
 
-    // Fill and bind lights buffer
-    TypedBuffer<shader::PointLight> light_buffer(nullptr, std::max(_point_lights.size(), size_t(1)));
     {
-        auto mapping = light_buffer.map(AccessType::WriteOnly);
+        auto mapping = _point_light_buffer->map(AccessType::WriteOnly);
         for(size_t i = 0; i != _point_lights.size(); ++i) {
             const auto& light = _point_lights[i];
             mapping[i] = {
@@ -97,7 +101,14 @@ void Scene::render() const {
             };
         }
     }
-    light_buffer.bind(BufferUsage::Storage, 1);
+
+    _point_light_buffer->bind(BufferUsage::Storage, 1);
+}
+
+void Scene::render() const {
+    bind_buffer();
+
+    bind_buffer_pl();
 
     // Render the sky
     _sky_material.bind();

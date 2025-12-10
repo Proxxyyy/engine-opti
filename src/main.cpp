@@ -630,7 +630,7 @@ int main(int argc, char** argv) {
                 renderer.gbuffer_albedo_roughness.bind(0);
                 renderer.gbuffer_normal_metal.bind(1);
                 renderer.depth_texture.bind(2);
-                scene->bind_buffer();
+                scene->bind_buffer_pl();
                 
                 renderer.point_light_material.bind();
                 draw_full_screen_triangle();
