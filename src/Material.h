@@ -12,6 +12,7 @@ namespace OM3D {
 enum class BlendMode {
     None,
     Alpha,
+    Additive,
 };
 
 enum class DepthTestMode {
@@ -29,6 +30,7 @@ class Material {
         void set_program(std::shared_ptr<Program> prog);
         void set_blend_mode(BlendMode blend);
         void set_depth_test_mode(DepthTestMode depth);
+        void set_depth_write(bool write);
         void set_double_sided(bool double_sided);
         void set_texture(u32 slot, std::shared_ptr<Texture> tex);
 
@@ -47,6 +49,7 @@ class Material {
 
         static Material textured_pbr_material(bool alpha_test = false);
         static Material gbuffer_material(bool alpha_test = false);
+        static Material point_light_material();
 
     private:
         std::shared_ptr<Program> _program;
@@ -55,6 +58,7 @@ class Material {
 
         BlendMode _blend_mode = BlendMode::None;
         DepthTestMode _depth_test_mode = DepthTestMode::Standard;
+        bool _depth_write = true;
         bool _double_sided = false;
 };
 

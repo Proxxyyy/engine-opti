@@ -21,6 +21,10 @@ void Material::set_depth_test_mode(DepthTestMode depth) {
     _depth_test_mode = depth;
 }
 
+void Material::set_depth_write(bool write) {
+    _depth_write = write;
+}
+
 void Material::set_double_sided(bool double_sided) {
     _double_sided = double_sided;
 }
@@ -63,6 +67,15 @@ void Material::bind() const {
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         break;
+
+        case BlendMode::Additive:
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            glFrontFace(GL_CCW);
+
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);
+        break;
     }
 
     switch(_depth_test_mode) {
@@ -87,6 +100,9 @@ void Material::bind() const {
             glDepthFunc(GL_LEQUAL);
         break;
     }
+
+    // Control depth buffer writes
+    glDepthMask(_depth_write ? GL_TRUE : GL_FALSE);
 
     for(const auto& texture : _textures) {
         texture.second->bind(texture.first);
@@ -130,6 +146,17 @@ Material Material::gbuffer_material(bool alpha_test) {
     material.set_texture(2u, default_metal_rough_texture());
     material.set_texture(3u, default_white_texture());
 
+    return material;
+}
+
+Material Material::point_light_material() {
+    Material material;
+    
+    material._program = Program::from_files("pl.frag", "screen.vert");
+    material.set_blend_mode(BlendMode::Additive);
+    material.set_depth_test_mode(DepthTestMode::None);
+    material.set_depth_write(false);
+    
     return material;
 }
 

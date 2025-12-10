@@ -411,9 +411,9 @@ struct RendererState {
             state.shadow_framebuffer = Framebuffer(&state.shadow_depth_texture);
             state.shadow_program = Program::from_files("shadow.frag", "shadow.vert");
 
-            state.scene_shading_program = Program::from_files("scene.frag", "screen.vert");
-
-            //state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
+            state.scene_shading_program = Program::from_files("scene.frag", "screen.vert");  // Without IBL
+            state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
+            state.point_light_material = Material::point_light_material();
         }
 
         return state;
@@ -445,6 +445,7 @@ struct RendererState {
     Framebuffer shading_framebuffer;
     std::shared_ptr<Program> scene_shading_program;
     std::shared_ptr<Program> pl_shading_program;
+    Material point_light_material;
 };
 
 int main(int argc, char** argv) {
@@ -602,26 +603,47 @@ int main(int argc, char** argv) {
                 PROFILE_GPU("Shading Pass");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shading Pass");
 
+                glDisable(GL_BLEND);
+                glDisable(GL_DEPTH_TEST);
+                glDepthMask(GL_FALSE);
+                glDisable(GL_CULL_FACE);
+
                 renderer.shading_framebuffer.bind(false, true);
                 renderer.scene_shading_program->bind();
 
                 renderer.gbuffer_albedo_roughness.bind(0);
                 renderer.gbuffer_normal_metal.bind(1);
                 renderer.depth_texture.bind(2);
-                scene->bind_buffer(); // bind frame data buffer
+                scene->bind_buffer();
                 
                 draw_full_screen_triangle();
-
-                // material ??? blend et tt
-
-                //renderer.pl_shading_program->bind();
-
-                //draw_full_screen_triangle();
 
                 glPopDebugGroup();
             }
 
-            //Apply a tonemap as a full screen pass (kept but not used in current pipeline)
+            {
+                PROFILE_GPU("Point Lights Pass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Point Lights Pass");
+
+                renderer.shading_framebuffer.bind(false, false);
+                
+                renderer.gbuffer_albedo_roughness.bind(0);
+                renderer.gbuffer_normal_metal.bind(1);
+                renderer.depth_texture.bind(2);
+                scene->bind_buffer();
+                
+                renderer.point_light_material.bind();
+                draw_full_screen_triangle();
+                
+                glDepthMask(GL_TRUE);
+                glDisable(GL_BLEND);
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+
+                glPopDebugGroup();
+            }
+
+            //Apply a tonemap as a full screen pass
             {
                 PROFILE_GPU("Tonemap");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
