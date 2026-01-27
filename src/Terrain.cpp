@@ -29,7 +29,7 @@ namespace OM3D
         _rocks_albedo = load_texture("../../textures/cliff_rocks_02_2k/cliff_rocks_02_baseColor_2k.png");
         _snow_albedo = load_texture("../../textures/snow_01_2k/snow_01_color_2k.png");
 
-        generate_grid_mesh(64);
+        generate_grid_mesh(512);
         update();
     }
 

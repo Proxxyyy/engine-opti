@@ -54,7 +54,7 @@ namespace OM3D
         u32 _index_count = 0;
 
         // Terrain settings
-        float _size = 1000.0f;
+        float _size = 8192.0f;
         float _height_scale = 30.0f;
         float _noise_frequency = 0.1f;
     };
