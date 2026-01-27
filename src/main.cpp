@@ -120,6 +120,7 @@ void process_inputs(GLFWwindow* window, Camera& camera) {
     mouse_pos = new_mouse_pos;
 }
 
+
 void load_envmap(const std::string& filename) {
     if(auto res = TextureData::from_file(filename); res.is_ok) {
         envmap = std::make_shared<Texture>(Texture::cubemap_from_equirec(res.value));
@@ -383,6 +384,16 @@ struct RendererState {
         state.size = size;
 
         if(state.size.x > 0 && state.size.y > 0) {
+            renderer.heightmap_program->bind();
+    
+            // Set uniforms
+            renderer.heightmap_program->set_uniform(HASH("anim_time"), float(0.0));
+            renderer.heightmap_program->set_uniform(HASH("uResolution"), glm::vec2(renderer.heightmap_texture.size()));
+            
+            // Bind textures to image units
+            renderer.heightmap_texture.bind_as_image(0, AccessType::ReadWrite);
+            renderer.normalmap_texture.bind_as_image(1, AccessType::ReadWrite);
+
             state.depth_texture = Texture(size, ImageFormat::Depth32_FLOAT, WrapMode::Clamp);
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
             state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
@@ -414,6 +425,12 @@ struct RendererState {
             state.scene_shading_program = Program::from_files("scene.frag", "screen.vert");  // Without IBL
             state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
             state.point_light_material = Material::point_light_material();
+            
+            // Heightmap and normalmap resources
+            const glm::uvec2 heightmap_size = glm::uvec2(1024u, 1024u);
+            state.heightmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
+            state.normalmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
+            state.heightmap_program = Program::from_file("heightmap.comp");
         }
 
         return state;
@@ -446,7 +463,13 @@ struct RendererState {
     std::shared_ptr<Program> scene_shading_program;
     std::shared_ptr<Program> pl_shading_program;
     Material point_light_material;
+    
+    // Heightmap and normalmap resources
+    Texture heightmap_texture;
+    Texture normalmap_texture;
+    std::shared_ptr<Program> heightmap_program;
 };
+
 
 int main(int argc, char** argv) {
     DEBUG_ASSERT([] { std::cout << "Debug asserts enabled" << std::endl; return true; }());
@@ -491,6 +514,10 @@ int main(int argc, char** argv) {
 
             if(renderer.size != glm::uvec2(width, height)) {
                 renderer = RendererState::create(glm::uvec2(width, height));
+                // Execute compute shader
+                const glm::uvec2 workgroup_size = renderer.heightmap_texture.size();
+                glDispatchCompute((workgroup_size.x + 15) / 16, (workgroup_size.y + 15) / 16, 1);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
         }
 
@@ -504,7 +531,6 @@ int main(int argc, char** argv) {
         {
             PROFILE_GPU("Frame");
             glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Frame");
-
             // Z-prepass (for G-Buffer)
             {
                 PROFILE_GPU("Z-prepass");
