@@ -477,7 +477,7 @@ struct RendererState
             state.point_light_material = Material::point_light_material();
 
             // Heightmap and normalmap resources
-            const glm::uvec2 heightmap_size = glm::uvec2(512u, 512u);
+            const glm::uvec2 heightmap_size = glm::uvec2(256u, 256u);
             state.heightmap_texture =
                     std::make_shared<Texture>(heightmap_size, ImageFormat::R32_FLOAT, WrapMode::Clamp);
             state.normalmap_texture =

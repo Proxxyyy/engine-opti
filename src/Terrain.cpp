@@ -26,7 +26,7 @@ namespace OM3D
         _compute_program->bind();
         _compute_program->set_uniform(HASH("u_camera_pos"), glm::vec2(0.0f, 0.0f));
         _compute_program->set_uniform(HASH("u_scale"), _size);
-        _compute_program->set_uniform(HASH("u_noise_freq_scale"), 0.5f);
+        _compute_program->set_uniform(HASH("u_noise_freq_scale"), _noise_frequency);
         _compute_program->set_uniform(HASH("u_height_scale"), _height_scale);
 
         // Bind image
@@ -68,7 +68,9 @@ namespace OM3D
         // Draw terrain patches
         glBindVertexArray(_vao);
         glPatchParameteri(GL_PATCH_VERTICES, 4);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glDrawElements(GL_PATCHES, _index_count, GL_UNSIGNED_INT, nullptr);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  // restore to normal
 
         // Restore previous VAO
         glBindVertexArray(prev_vao);
