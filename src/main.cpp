@@ -4,6 +4,8 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include <Terrain.h>
+
 #include <Framebuffer.h>
 #include <ImGuiRenderer.h>
 #include <Scene.h>
@@ -30,6 +32,7 @@ static int gbuffer_debug_mode = 2; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4
 
 static std::unique_ptr<Scene> scene;
 static std::shared_ptr<Texture> envmap;
+static std::unique_ptr<Terrain> terrain;
 
 namespace OM3D
 {
@@ -441,17 +444,9 @@ struct RendererState
 
         state.size = size;
 
-        if(state.size.x > 0 && state.size.y > 0) {
-            renderer.heightmap_program->bind();
-    
-            // Set uniforms
-            renderer.heightmap_program->set_uniform(HASH("anim_time"), float(0.0));
-            renderer.heightmap_program->set_uniform(HASH("uResolution"), glm::vec2(renderer.heightmap_texture.size()));
-            
-            // Bind textures to image units
-            renderer.heightmap_texture.bind_as_image(0, AccessType::ReadWrite);
-            renderer.normalmap_texture.bind_as_image(1, AccessType::ReadWrite);
-
+        if (state.size.x > 0 && state.size.y > 0)
+        {
+            // Create textures first
             state.depth_texture = Texture(size, ImageFormat::Depth32_FLOAT, WrapMode::Clamp);
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
             state.tone_mapped_texture = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
@@ -481,12 +476,29 @@ struct RendererState
             state.scene_shading_program = Program::from_files("scene.frag", "screen.vert"); // Without IBL
             state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
             state.point_light_material = Material::point_light_material();
-            
-            // Heightmap and normalmap resources
-            const glm::uvec2 heightmap_size = glm::uvec2(1024u, 1024u);
-            state.heightmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
-            state.normalmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
-            state.heightmap_program = Program::from_file("heightmap.comp");
+
+            // Heightmap and normalmap resources - MUST be created before being used!
+            // const glm::uvec2 heightmap_size = glm::uvec2(1024u, 1024u);
+            // state.heightmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
+            // state.normalmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
+            // state.heightmap_program = Program::from_file("heightmap.comp");
+
+            // Terrain rendering programs (tessellation shaders)
+            state.terrain_gbuffer_program =
+                    Program::from_files("terrain_gbuffer.frag", "terrain.vert", "terrain.tesc", "terrain.tese");
+            state.terrain_depth_program =
+                    Program::from_files("depth.frag", "terrain.vert", "terrain.tesc", "terrain.tese");
+
+            // Now we can use them
+            // state.heightmap_program->bind();
+
+            // Set uniforms
+            // state.heightmap_program->set_uniform(HASH("anim_time"), float(0.0));
+            // state.heightmap_program->set_uniform(HASH("uResolution"), glm::vec2(state.heightmap_texture.size()));
+
+            // Bind textures to image units
+            // state.heightmap_texture.bind_as_image(0, AccessType::ReadWrite);
+            // state.normalmap_texture.bind_as_image(1, AccessType::ReadWrite);
         }
 
         return state;
@@ -519,11 +531,15 @@ struct RendererState
     std::shared_ptr<Program> scene_shading_program;
     std::shared_ptr<Program> pl_shading_program;
     Material point_light_material;
-    
+
     // Heightmap and normalmap resources
-    Texture heightmap_texture;
-    Texture normalmap_texture;
-    std::shared_ptr<Program> heightmap_program;
+    // Texture heightmap_texture;
+    // Texture normalmap_texture;
+    // std::shared_ptr<Program> heightmap_program;
+
+    // Terrain rendering programs (tessellation-based)
+    std::shared_ptr<Program> terrain_gbuffer_program;
+    std::shared_ptr<Program> terrain_depth_program;
 };
 
 int main(int argc, char** argv)
@@ -555,6 +571,9 @@ int main(int argc, char** argv)
 
     std::unique_ptr<ImGuiRenderer> imgui = std::make_unique<ImGuiRenderer>(window);
 
+    terrain = std::make_unique<Terrain>();
+    terrain->init();
+
     load_default_scene();
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
@@ -579,9 +598,9 @@ int main(int argc, char** argv)
             {
                 renderer = RendererState::create(glm::uvec2(width, height));
                 // Execute compute shader
-                const glm::uvec2 workgroup_size = renderer.heightmap_texture.size();
-                glDispatchCompute((workgroup_size.x + 15) / 16, (workgroup_size.y + 15) / 16, 1);
-                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                // const glm::uvec2 workgroup_size = renderer.heightmap_texture.size();
+                // glDispatchCompute((workgroup_size.x + 15) / 16, (workgroup_size.y + 15) / 16, 1);
+                // glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
         }
 
@@ -591,6 +610,8 @@ int main(int argc, char** argv)
         {
             process_inputs(window, scene->camera());
         }
+
+        terrain->update();
 
         // Draw everything
         {
@@ -607,6 +628,10 @@ int main(int argc, char** argv)
                 glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
                 renderer.depth_program->bind();
                 scene->render();
+
+                renderer.terrain_depth_program->bind();
+                renderer.terrain_depth_program->set_uniform(HASH("u_view_proj"), scene->camera().view_proj_matrix());
+                terrain->render(*renderer.terrain_depth_program);
                 glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
                 glPopDebugGroup();
@@ -655,6 +680,7 @@ int main(int argc, char** argv)
                 {
                     obj.render_depth_only(*renderer.shadow_program);
                 }
+                // terrain->render_shadow(light_space);
 
                 glDepthFunc(prev_depth_func);
                 glClearDepth(prev_clear_depth);
@@ -671,6 +697,10 @@ int main(int argc, char** argv)
                 renderer.gbuffer_framebuffer.bind(false, true);
                 renderer.shadow_depth_texture.bind(6);
                 scene->render();
+
+                renderer.terrain_gbuffer_program->bind();
+                renderer.terrain_gbuffer_program->set_uniform(HASH("u_view_proj"), scene->camera().view_proj_matrix());
+                terrain->render(*renderer.terrain_gbuffer_program);
 
                 glPopDebugGroup();
             }
