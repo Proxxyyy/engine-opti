@@ -1,7 +1,7 @@
 #ifndef DEFINES_H
 #define DEFINES_H
 
-#define CREATE_NAME_LINE_HELPER(prefix, LINE) _generated_ ## prefix ## _at_ ## LINE
+#define CREATE_NAME_LINE_HELPER(prefix, LINE) _generated_##prefix##_at_##LINE
 #define CREATE_NAME_HELPER(prefix, LINE) CREATE_NAME_LINE_HELPER(prefix, LINE)
 #define CREATE_UNIQUE_NAME_WITH_PREFIX(prefix) CREATE_NAME_HELPER(prefix, __LINE__)
 #define CREATE_UNIQUE_NAME CREATE_UNIQUE_NAME_WITH_PREFIX()

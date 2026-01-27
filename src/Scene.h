@@ -1,18 +1,20 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-#include <SceneObject.h>
-#include <PointLight.h>
 #include <Camera.h>
-#include <shader_structs.h>
+#include <PointLight.h>
+#include <SceneObject.h>
 #include <TypedBuffer.h>
+#include <shader_structs.h>
 
-#include <vector>
 #include <memory>
+#include <vector>
 
-namespace OM3D {
+namespace OM3D
+{
 
-class Scene : NonMovable {
+    class Scene : NonMovable
+    {
 
     public:
         Scene();
@@ -55,8 +57,8 @@ class Scene : NonMovable {
 
         Camera _camera;
         glm::mat4 _light_view_proj = glm::mat4(1.0f);
-};
+    };
 
-}
+} // namespace OM3D
 
 #endif // SCENE_H

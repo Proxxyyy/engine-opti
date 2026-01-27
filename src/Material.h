@@ -7,22 +7,26 @@
 #include <memory>
 #include <vector>
 
-namespace OM3D {
+namespace OM3D
+{
 
-enum class BlendMode {
-    None,
-    Alpha,
-    Additive,
-};
+    enum class BlendMode
+    {
+        None,
+        Alpha,
+        Additive,
+    };
 
-enum class DepthTestMode {
-    Standard,
-    Reversed,
-    Equal,
-    None
-};
+    enum class DepthTestMode
+    {
+        Standard,
+        Reversed,
+        Equal,
+        None
+    };
 
-class Material {
+    class Material
+    {
 
     public:
         Material();
@@ -41,7 +45,8 @@ class Material {
 
         // Uniform is set immediately and might get overriden by 'set_uniform' called on OTHER materials
         template<typename... Args>
-        void set_uniform(Args&&... args) const {
+        void set_uniform(Args&&... args) const
+        {
             _program->set_uniform(FWD(args)...);
         }
 
@@ -60,8 +65,8 @@ class Material {
         DepthTestMode _depth_test_mode = DepthTestMode::Standard;
         bool _depth_write = true;
         bool _double_sided = false;
-};
+    };
 
-}
+} // namespace OM3D
 
 #endif // MATERIAL_H

@@ -7,8 +7,8 @@
 #include <Framebuffer.h>
 #include <ImGuiRenderer.h>
 #include <Scene.h>
-#include <Texture.h>
 #include <Terrain.h>
+#include <Texture.h>
 #include <TimestampQuery.h>
 #include <graphics.h>
 
@@ -443,7 +443,8 @@ struct RendererState
 
         state.size = size;
 
-        if(state.size.x > 0 && state.size.y > 0) {
+        if (state.size.x > 0 && state.size.y > 0)
+        {
 
             state.depth_texture = Texture(size, ImageFormat::Depth32_FLOAT, WrapMode::Clamp);
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
@@ -474,13 +475,15 @@ struct RendererState
             state.scene_shading_program = Program::from_files("scene.frag", "screen.vert"); // Without IBL
             state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
             state.point_light_material = Material::point_light_material();
-            
+
             // Heightmap and normalmap resources
             const glm::uvec2 heightmap_size = glm::uvec2(512u, 512u);
-            state.heightmap_texture = std::make_shared<Texture>(heightmap_size, ImageFormat::R32_FLOAT, WrapMode::Clamp);
-            state.normalmap_texture = std::make_shared<Texture>(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
+            state.heightmap_texture =
+                    std::make_shared<Texture>(heightmap_size, ImageFormat::R32_FLOAT, WrapMode::Clamp);
+            state.normalmap_texture =
+                    std::make_shared<Texture>(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
             state.heightmap_program = Program::from_file("terrain_gen.comp");
-            
+
             // Terrain rendering programs (tessellation shaders)
             state.terrain_gbuffer_program =
                     Program::from_files("terrain_gbuffer.frag", "terrain.vert", "terrain.tesc", "terrain.tese");
@@ -523,7 +526,7 @@ struct RendererState
     std::shared_ptr<Program> scene_shading_program;
     std::shared_ptr<Program> pl_shading_program;
     Material point_light_material;
-    
+
     // Heightmap and normalmap resources
     std::shared_ptr<Texture> heightmap_texture;
     std::shared_ptr<Texture> normalmap_texture;
@@ -562,12 +565,12 @@ int main(int argc, char** argv)
 
     std::unique_ptr<ImGuiRenderer> imgui = std::make_unique<ImGuiRenderer>(window);
 
-    
+
     load_default_scene();
-    
-    
+
+
     terrain = std::make_unique<Terrain>();
-    
+
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     RendererState renderer;
@@ -640,8 +643,8 @@ int main(int argc, char** argv)
 
             //     const float ortho_size = 20.0f;
             //     const glm::mat4 light_view = glm::lookAt(light_pos, scene_center, glm::vec3(0.0f, 1.0f, 0.0f));
-            //     const glm::mat4 light_proj = glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, 0.1f, 100.0f);
-            //     const glm::mat4 light_space = light_proj * light_view;
+            //     const glm::mat4 light_proj = glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, 0.1f,
+            //     100.0f); const glm::mat4 light_space = light_proj * light_view;
 
             //     scene->set_light_view_proj(light_space);
 
@@ -677,7 +680,6 @@ int main(int argc, char** argv)
 
             //     glPopDebugGroup();
             // }
-
 
 
             // G-Buffer pass

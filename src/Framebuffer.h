@@ -5,13 +5,15 @@
 
 #include <array>
 
-namespace OM3D {
+namespace OM3D
+{
 
-class Framebuffer : NonCopyable {
+    class Framebuffer : NonCopyable
+    {
     public:
         template<size_t N>
-        Framebuffer(Texture* depth, std::array<Texture*, N> colors) : Framebuffer(depth, colors.data(), colors.size()) {
-        }
+        Framebuffer(Texture* depth, std::array<Texture*, N> colors) : Framebuffer(depth, colors.data(), colors.size())
+        {}
 
 
         Framebuffer();
@@ -31,8 +33,8 @@ class Framebuffer : NonCopyable {
 
         GLHandle _handle;
         glm::uvec2 _size = {};
-};
+    };
 
-}
+} // namespace OM3D
 
 #endif // FRAMEBUFFER_H
