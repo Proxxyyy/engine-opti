@@ -17,7 +17,7 @@ namespace OM3D
     ByteBuffer::ByteBuffer(const void* data, size_t size) : _handle(create_buffer_handle()), _size(size)
     {
         ALWAYS_ASSERT(_size, "Buffer size can not be 0");
-        glNamedBufferData(_handle.get(), size, data, GL_STATIC_DRAW);
+        glNamedBufferData(_handle.get(), size, data, GL_DYNAMIC_DRAW);
     }
 
     ByteBuffer::~ByteBuffer()

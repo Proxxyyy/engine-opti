@@ -1,6 +1,7 @@
 #include "Scene.h"
 
 #include <TypedBuffer.h>
+#include <iostream>
 
 namespace OM3D
 {
@@ -149,6 +150,7 @@ namespace OM3D
             // Transparent after
             for (const SceneObject& obj: _objects)
             {
+
                 if (!obj.material().is_opaque())
                 {
                     // Check frustum culling

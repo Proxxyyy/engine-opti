@@ -2,6 +2,7 @@
 #define TERRAIN_H
 
 #include <Program.h>
+#include <Camera.h>
 #include <Texture.h>
 #include <TypedBuffer.h>
 #include <Vertex.h>
@@ -26,7 +27,7 @@ namespace OM3D
 
         // Single render method - expects program to already be bound
         // Sets terrain-specific uniforms and draws
-        void render(Program& program) const;
+        void render(Program& program, const Camera& camera) const;
 
         // Getters for terrain resources (needed for external program setup)
         const Texture& heightmap() const { return *_heightmap; }
@@ -35,7 +36,7 @@ namespace OM3D
 
     private:
         void generate_grid_mesh(u32 grid_size);
-        void set_common_uniforms(Program& program) const;
+        void set_common_uniforms(Program& program, const Camera& camera) const;
 
         std::shared_ptr<Texture> _heightmap;
         std::shared_ptr<Program> _compute_program;

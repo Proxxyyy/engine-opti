@@ -11,7 +11,7 @@ namespace OM3D
         _compute_program = std::move(compute_program);
         _heightmap = std::move(heightmap);
 
-        generate_grid_mesh(32);
+        generate_grid_mesh(64);
         update();
     }
 
@@ -38,9 +38,12 @@ namespace OM3D
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
-    void Terrain::set_common_uniforms(Program& program) const
+    void Terrain::set_common_uniforms(Program& program, const Camera& camera) const
     {
+        // Keep terrain fixed at world origin instead of following camera
         program.set_uniform(HASH("u_camera_pos_xz"), glm::vec2(0.0f, 0.0f));
+        program.set_uniform(HASH("u_view_proj"), camera.view_proj_matrix());
+        program.set_uniform(HASH("u_model_view"), camera.view_matrix() * glm::mat4(1.0f));
         program.set_uniform(HASH("u_terrain_size"), _size);
         program.set_uniform(HASH("u_height_scale"), _height_scale);
         program.set_uniform(HASH("u_max_dist"), _size * 2.0f);
@@ -48,18 +51,24 @@ namespace OM3D
         program.set_uniform(HASH("u_model"), glm::mat4(1.0f));
     }
 
-    void Terrain::render(Program& program) const
+    void Terrain::render(Program& program, const Camera& camera) const
     {
         if (!_heightmap || _vao == 0 || _index_count == 0)
         {
             return;
         }
 
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_GEQUAL); // Reverse-Z
+        glDepthMask(GL_TRUE);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
         // Bind heightmap texture
         _heightmap->bind(0);
 
         // Set terrain-specific uniforms
-        set_common_uniforms(program);
+        set_common_uniforms(program, camera);
 
         // Save previous VAO state
         GLint prev_vao = 0;

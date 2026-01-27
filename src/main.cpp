@@ -477,7 +477,7 @@ struct RendererState
             state.point_light_material = Material::point_light_material();
 
             // Heightmap and normalmap resources
-            const glm::uvec2 heightmap_size = glm::uvec2(256u, 256u);
+            const glm::uvec2 heightmap_size = glm::uvec2(1024u, 1024u);
             state.heightmap_texture =
                     std::make_shared<Texture>(heightmap_size, ImageFormat::R32_FLOAT, WrapMode::Clamp);
             state.normalmap_texture =
@@ -619,10 +619,11 @@ int main(int argc, char** argv)
                 glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
                 renderer.depth_program->bind();
                 scene->render();
+                
+
 
                 renderer.terrain_depth_program->bind();
-                renderer.terrain_depth_program->set_uniform(HASH("u_view_proj"), scene->camera().view_proj_matrix());
-                terrain->render(*renderer.terrain_depth_program);
+                terrain->render(*renderer.terrain_depth_program, scene->camera());
                 glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
                 glPopDebugGroup();
@@ -694,8 +695,7 @@ int main(int argc, char** argv)
                 scene->render();
 
                 renderer.terrain_gbuffer_program->bind();
-                renderer.terrain_gbuffer_program->set_uniform(HASH("u_view_proj"), scene->camera().view_proj_matrix());
-                terrain->render(*renderer.terrain_gbuffer_program);
+                terrain->render(*renderer.terrain_gbuffer_program, scene->camera());
 
                 glPopDebugGroup();
             }
