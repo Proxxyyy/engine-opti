@@ -25,6 +25,7 @@ void main() {
         const int MAX_TESS_LEVEL = 64;
         const float MIN_DISTANCE = 50.0;
         const float MAX_DISTANCE = 300.0;
+        const float CULL_DISTANCE = 400.0;  // Distance beyond which patches are discarded
 
         // Transform vertices to eye space
         vec4 eyePos00 = u_model_view * gl_in[0].gl_Position;
@@ -37,6 +38,19 @@ void main() {
         float dist01 = length(eyePos01.xyz);
         float dist10 = length(eyePos10.xyz);
         float dist11 = length(eyePos11.xyz);
+
+        // Distance culling: if ALL vertices are beyond cull distance, discard the patch
+        float minDist = min(min(dist00, dist01), min(dist10, dist11));
+        if (minDist > CULL_DISTANCE) {
+            // Discard patch entirely by setting tessellation to 0
+            gl_TessLevelOuter[0] = 0.0;
+            gl_TessLevelOuter[1] = 0.0;
+            gl_TessLevelOuter[2] = 0.0;
+            gl_TessLevelOuter[3] = 0.0;
+            gl_TessLevelInner[0] = 0.0;
+            gl_TessLevelInner[1] = 0.0;
+            return;
+        }
 
         // Calculate smooth tessellation falloff using smoothstep
         // smoothstep(edge0, edge1, x) smoothly interpolates from 0 to 1 as x goes from edge0 to edge1
