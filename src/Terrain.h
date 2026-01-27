@@ -1,8 +1,8 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
-#include <Program.h>
 #include <Camera.h>
+#include <Program.h>
 #include <Texture.h>
 #include <TypedBuffer.h>
 #include <Vertex.h>
@@ -40,6 +40,12 @@ namespace OM3D
 
         std::shared_ptr<Texture> _heightmap;
         std::shared_ptr<Program> _compute_program;
+
+        // Terrain material textures
+        std::shared_ptr<Texture> _grass_albedo;
+        std::shared_ptr<Texture> _forest_albedo;
+        std::shared_ptr<Texture> _rocks_albedo;
+        std::shared_ptr<Texture> _snow_albedo;
 
         // Raw OpenGL handles
         GLuint _vao = 0;

@@ -313,6 +313,14 @@ namespace OM3D
         }
     }
 
+    void Program::set_uniform(u32 name_hash, i32 value)
+    {
+        if (const int loc = find_location(name_hash); loc >= 0)
+        {
+            glProgramUniform1i(_handle.get(), loc, value);
+        }
+    }
+
     void Program::set_uniform(u32 name_hash, float value)
     {
         if (const int loc = find_location(name_hash); loc >= 0)

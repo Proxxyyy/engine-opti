@@ -1,5 +1,6 @@
 #include "Terrain.h"
 #include <glad/gl.h>
+#include <iostream>
 
 namespace OM3D
 {
@@ -10,6 +11,23 @@ namespace OM3D
     {
         _compute_program = std::move(compute_program);
         _heightmap = std::move(heightmap);
+
+        // Load terrain material textures
+        auto load_texture = [](const std::string& path) -> std::shared_ptr<Texture>
+        {
+            auto result = TextureData::from_file(path);
+            if (result.is_ok)
+            {
+                return std::make_shared<Texture>(result.value);
+            }
+            std::cerr << "Failed to load texture: " << path << std::endl;
+            return nullptr;
+        };
+
+        _grass_albedo = load_texture("../../textures/moss_ground_02_2k/moss_groud_02_Base_Color_2k.png");
+        _forest_albedo = load_texture("../../textures/grass_01_2k/grass_01_color_2k.png");
+        _rocks_albedo = load_texture("../../textures/cliff_rocks_02_2k/cliff_rocks_02_baseColor_2k.png");
+        _snow_albedo = load_texture("../../textures/snow_01_2k/snow_01_color_2k.png");
 
         generate_grid_mesh(64);
         update();
@@ -67,8 +85,24 @@ namespace OM3D
         // Bind heightmap texture
         _heightmap->bind(0);
 
+        // Bind terrain material textures
+        if (_grass_albedo)
+            _grass_albedo->bind(1);
+        if (_forest_albedo)
+            _forest_albedo->bind(2);
+        if (_rocks_albedo)
+            _rocks_albedo->bind(3);
+        if (_snow_albedo)
+            _snow_albedo->bind(4);
+
         // Set terrain-specific uniforms
         set_common_uniforms(program, camera);
+
+        // Set sampler uniforms for terrain textures (must use i32, not u32)
+        program.set_uniform(HASH("u_grass_albedo"), 1);
+        program.set_uniform(HASH("u_forest_albedo"), 2);
+        program.set_uniform(HASH("u_rocks_albedo"), 3);
+        program.set_uniform(HASH("u_snow_albedo"), 4);
 
         // Save previous VAO state
         GLint prev_vao = 0;
@@ -77,9 +111,9 @@ namespace OM3D
         // Draw terrain patches
         glBindVertexArray(_vao);
         glPatchParameteri(GL_PATCH_VERTICES, 4);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glDrawElements(GL_PATCHES, _index_count, GL_UNSIGNED_INT, nullptr);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  // restore to normal
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // restore to normal
 
         // Restore previous VAO
         glBindVertexArray(prev_vao);

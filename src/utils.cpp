@@ -1,5 +1,7 @@
 #include <utils.h>
 
+#include <glad/gl.h>
+
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>

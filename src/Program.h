@@ -56,6 +56,7 @@ namespace OM3D
                                                    const std::string& tesc, const std::string& tese,
                                                    Span<const std::string> defines = {});
         void set_uniform(u32 name_hash, u32 value);
+        void set_uniform(u32 name_hash, i32 value); // For sampler uniforms
         void set_uniform(u32 name_hash, float value);
         void set_uniform(u32 name_hash, glm::vec2 value);
         void set_uniform(u32 name_hash, glm::vec3 value);
