@@ -148,6 +148,28 @@ Program::Program(const std::string& comp) : _handle(glCreateProgram()), _is_comp
     fetch_uniform_locations();
 }
 
+Program::Program(const std::string& frag, const std::string& vert,
+                const std::string& tesc, const std::string& tese) : _handle(glCreateProgram()) {
+    const GLuint frag_handle = create_shader(frag, GL_FRAGMENT_SHADER);
+    const GLuint vert_handle = create_shader(vert, GL_VERTEX_SHADER);
+    const GLuint tesc_handle = create_shader(tesc, GL_TESS_CONTROL_SHADER);
+    const GLuint tese_handle = create_shader(tese, GL_TESS_EVALUATION_SHADER);
+
+    glAttachShader(_handle.get(), frag_handle);
+    glAttachShader(_handle.get(), vert_handle);
+    glAttachShader(_handle.get(), tesc_handle);
+    glAttachShader(_handle.get(), tese_handle);
+
+    link_program(_handle.get());
+
+    glDeleteShader(frag_handle);
+    glDeleteShader(vert_handle);
+    glDeleteShader(tesc_handle);
+    glDeleteShader(tese_handle);
+
+    fetch_uniform_locations();
+}
+
 void Program::fetch_uniform_locations() {
     int uniform_count = 0;
     glGetProgramiv(_handle.get(), GL_ACTIVE_UNIFORMS, &uniform_count);
@@ -212,6 +234,33 @@ std::shared_ptr<Program> Program::from_files(const std::string& frag, const std:
     }
     return program;
 }
+
+std::shared_ptr<Program> Program::from_files(const std::string& frag, const std::string& vert,
+                                                 const std::string& tesc, const std::string& tese,
+                                                 Span<const std::string> defines)
+    {
+        static std::unordered_map<std::vector<std::string>, std::weak_ptr<Program>,
+                                  CollectionHasher<std::vector<std::string>>>
+                loaded;
+
+        std::vector<std::string> key(defines.begin(), defines.end());
+        key.emplace_back(frag);
+        key.emplace_back(vert);
+        key.emplace_back(tesc);
+        key.emplace_back(tese);
+
+        auto& weak_program = loaded[key];
+        auto program = weak_program.lock();
+        if (!program)
+        {
+            program = std::make_shared<Program>(read_shader(frag, defines), read_shader(vert, defines),
+                                                read_shader(tesc, defines), read_shader(tese, defines));
+            weak_program = program;
+        }
+        return program;
+    }
+
+
 
 int Program::find_location(u32 hash) {
     const auto it = std::lower_bound(_uniform_locations.begin(), _uniform_locations.end(), UniformLocationInfo{hash, 0});

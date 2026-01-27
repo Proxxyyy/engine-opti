@@ -39,6 +39,10 @@ class Texture {
 
         Texture(const TextureData& data);
 
+        u32 id() const {
+            return _handle.get();
+        }
+
         Texture(const glm::uvec2 &size, ImageFormat format, WrapMode wrap);
 
         static Texture empty_cubemap(u32 size, ImageFormat format, u32 mipmaps = 1);

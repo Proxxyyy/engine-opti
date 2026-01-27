@@ -8,6 +8,7 @@
 #include <ImGuiRenderer.h>
 #include <Scene.h>
 #include <Texture.h>
+#include <Terrain.h>
 #include <TimestampQuery.h>
 #include <graphics.h>
 
@@ -30,6 +31,7 @@ static int gbuffer_debug_mode = 2; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4
 
 static std::unique_ptr<Scene> scene;
 static std::shared_ptr<Texture> envmap;
+static std::unique_ptr<Terrain> terrain;
 
 namespace OM3D
 {
@@ -442,15 +444,6 @@ struct RendererState
         state.size = size;
 
         if(state.size.x > 0 && state.size.y > 0) {
-            renderer.heightmap_program->bind();
-    
-            // Set uniforms
-            renderer.heightmap_program->set_uniform(HASH("anim_time"), float(0.0));
-            renderer.heightmap_program->set_uniform(HASH("uResolution"), glm::vec2(renderer.heightmap_texture.size()));
-            
-            // Bind textures to image units
-            renderer.heightmap_texture.bind_as_image(0, AccessType::ReadWrite);
-            renderer.normalmap_texture.bind_as_image(1, AccessType::ReadWrite);
 
             state.depth_texture = Texture(size, ImageFormat::Depth32_FLOAT, WrapMode::Clamp);
             state.lit_hdr_texture = Texture(size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
@@ -483,10 +476,21 @@ struct RendererState
             state.point_light_material = Material::point_light_material();
             
             // Heightmap and normalmap resources
-            const glm::uvec2 heightmap_size = glm::uvec2(1024u, 1024u);
-            state.heightmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
-            state.normalmap_texture = Texture(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
-            state.heightmap_program = Program::from_file("heightmap.comp");
+            const glm::uvec2 heightmap_size = glm::uvec2(512u, 512u);
+            state.heightmap_texture = std::make_shared<Texture>(heightmap_size, ImageFormat::R32_FLOAT, WrapMode::Clamp);
+            state.normalmap_texture = std::make_shared<Texture>(heightmap_size, ImageFormat::RGBA16_FLOAT, WrapMode::Clamp);
+            state.heightmap_program = Program::from_file("terrain_gen.comp");
+            
+            // Terrain rendering programs (tessellation shaders)
+            state.terrain_gbuffer_program =
+                    Program::from_files("terrain_gbuffer.frag", "terrain.vert", "terrain.tesc", "terrain.tese");
+            state.terrain_depth_program =
+                    Program::from_files("depth.frag", "terrain.vert", "terrain.tesc", "terrain.tese");
+            state.heightmap_program->bind();
+
+            // Bind textures to image units
+            state.heightmap_texture->bind_as_image(0, AccessType::ReadWrite);
+            state.normalmap_texture->bind_as_image(1, AccessType::ReadWrite);
         }
 
         return state;
@@ -521,9 +525,12 @@ struct RendererState
     Material point_light_material;
     
     // Heightmap and normalmap resources
-    Texture heightmap_texture;
-    Texture normalmap_texture;
+    std::shared_ptr<Texture> heightmap_texture;
+    std::shared_ptr<Texture> normalmap_texture;
     std::shared_ptr<Program> heightmap_program;
+
+    std::shared_ptr<Program> terrain_gbuffer_program;
+    std::shared_ptr<Program> terrain_depth_program;
 };
 
 int main(int argc, char** argv)
@@ -555,7 +562,12 @@ int main(int argc, char** argv)
 
     std::unique_ptr<ImGuiRenderer> imgui = std::make_unique<ImGuiRenderer>(window);
 
+    
     load_default_scene();
+    
+    
+    terrain = std::make_unique<Terrain>();
+    
 
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     RendererState renderer;
@@ -578,10 +590,7 @@ int main(int argc, char** argv)
             if (renderer.size != glm::uvec2(width, height))
             {
                 renderer = RendererState::create(glm::uvec2(width, height));
-                // Execute compute shader
-                const glm::uvec2 workgroup_size = renderer.heightmap_texture.size();
-                glDispatchCompute((workgroup_size.x + 15) / 16, (workgroup_size.y + 15) / 16, 1);
-                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                terrain->init(renderer.heightmap_program, renderer.heightmap_texture);
             }
         }
 
@@ -607,63 +616,73 @@ int main(int argc, char** argv)
                 glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
                 renderer.depth_program->bind();
                 scene->render();
+
+                renderer.terrain_depth_program->bind();
+                renderer.terrain_depth_program->set_uniform(HASH("u_view_proj"), scene->camera().view_proj_matrix());
+                terrain->render(*renderer.terrain_depth_program);
                 glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 
                 glPopDebugGroup();
             }
 
+            // {
+            //     // --- Shadow depth pass ---
+            //     PROFILE_GPU("Shadow pass");
+            //     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shadow pass");
+
+            //     const float alt = glm::radians(sun_altitude);
+            //     const float azi = glm::radians(sun_azimuth);
+            //     const glm::vec3 light_dir =
+            //             glm::normalize(glm::vec3(sin(azi) * cos(alt), sin(alt), cos(azi) * cos(alt)));
+
+            //     const glm::vec3 scene_center = glm::vec3(0.0f);
+            //     const glm::vec3 light_pos = scene_center - light_dir * sun_altitude;
+
+            //     const float ortho_size = 20.0f;
+            //     const glm::mat4 light_view = glm::lookAt(light_pos, scene_center, glm::vec3(0.0f, 1.0f, 0.0f));
+            //     const glm::mat4 light_proj = glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, 0.1f, 100.0f);
+            //     const glm::mat4 light_space = light_proj * light_view;
+
+            //     scene->set_light_view_proj(light_space);
+
+            //     const glm::uvec2 shadow_size = renderer.shadow_depth_texture.size();
+            //     renderer.shadow_framebuffer.bind(true, false);
+            //     glViewport(0, 0, shadow_size.x, shadow_size.y);
+
+            //     GLint prev_depth_func = 0;
+            //     glGetIntegerv(GL_DEPTH_FUNC, &prev_depth_func);
+            //     GLdouble prev_clear_depth = 0.0;
+            //     glGetDoublev(GL_DEPTH_CLEAR_VALUE, &prev_clear_depth);
+
+            //     glEnable(GL_CULL_FACE);
+            //     glCullFace(GL_BACK);
+            //     glEnable(GL_DEPTH_TEST);
+            //     glDepthFunc(GL_LEQUAL);
+            //     glClearDepth(1.0);
+            //     glClear(GL_DEPTH_BUFFER_BIT);
+
+            //     renderer.shadow_program->bind();
+            //     renderer.shadow_program->set_uniform(HASH("lightSpaceMatrix"), light_space);
+            //     for (const SceneObject& obj: scene->objects())
+            //     {
+            //         obj.render_depth_only(*renderer.shadow_program);
+            //     }
+
+            //     glDepthFunc(prev_depth_func);
+            //     glClearDepth(prev_clear_depth);
+
+            //     int w = int(renderer.size.x);
+            //     int h = int(renderer.size.y);
+            //     glViewport(0, 0, w, h);
+
+            //     glPopDebugGroup();
+            // }
+
+
+
             // G-Buffer pass
+
             {
-                // --- Shadow depth pass ---
-                PROFILE_GPU("Shadow pass");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shadow pass");
-
-                const float alt = glm::radians(sun_altitude);
-                const float azi = glm::radians(sun_azimuth);
-                const glm::vec3 light_dir =
-                        glm::normalize(glm::vec3(sin(azi) * cos(alt), sin(alt), cos(azi) * cos(alt)));
-
-                const glm::vec3 scene_center = glm::vec3(0.0f);
-                const glm::vec3 light_pos = scene_center - light_dir * sun_altitude;
-
-                const float ortho_size = 20.0f;
-                const glm::mat4 light_view = glm::lookAt(light_pos, scene_center, glm::vec3(0.0f, 1.0f, 0.0f));
-                const glm::mat4 light_proj = glm::ortho(-ortho_size, ortho_size, -ortho_size, ortho_size, 0.1f, 100.0f);
-                const glm::mat4 light_space = light_proj * light_view;
-
-                scene->set_light_view_proj(light_space);
-
-                const glm::uvec2 shadow_size = renderer.shadow_depth_texture.size();
-                renderer.shadow_framebuffer.bind(true, false);
-                glViewport(0, 0, shadow_size.x, shadow_size.y);
-
-                GLint prev_depth_func = 0;
-                glGetIntegerv(GL_DEPTH_FUNC, &prev_depth_func);
-                GLdouble prev_clear_depth = 0.0;
-                glGetDoublev(GL_DEPTH_CLEAR_VALUE, &prev_clear_depth);
-
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
-                glEnable(GL_DEPTH_TEST);
-                glDepthFunc(GL_LEQUAL);
-                glClearDepth(1.0);
-                glClear(GL_DEPTH_BUFFER_BIT);
-
-                renderer.shadow_program->bind();
-                renderer.shadow_program->set_uniform(HASH("lightSpaceMatrix"), light_space);
-                for (const SceneObject& obj: scene->objects())
-                {
-                    obj.render_depth_only(*renderer.shadow_program);
-                }
-
-                glDepthFunc(prev_depth_func);
-                glClearDepth(prev_clear_depth);
-
-                int w = int(renderer.size.x);
-                int h = int(renderer.size.y);
-                glViewport(0, 0, w, h);
-
-                glPopDebugGroup();
 
                 PROFILE_GPU("G-Buffer pass");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "G-Buffer pass");
@@ -671,6 +690,10 @@ int main(int argc, char** argv)
                 renderer.gbuffer_framebuffer.bind(false, true);
                 renderer.shadow_depth_texture.bind(6);
                 scene->render();
+
+                renderer.terrain_gbuffer_program->bind();
+                renderer.terrain_gbuffer_program->set_uniform(HASH("u_view_proj"), scene->camera().view_proj_matrix());
+                terrain->render(*renderer.terrain_gbuffer_program);
 
                 glPopDebugGroup();
             }
@@ -715,27 +738,27 @@ int main(int argc, char** argv)
                 glPopDebugGroup();
             }
 
-            {
-                PROFILE_GPU("Point Lights Shading Pass");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Point Lights Shading Pass");
+            // {
+            //     PROFILE_GPU("Point Lights Shading Pass");
+            //     glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Point Lights Shading Pass");
 
-                renderer.shading_framebuffer.bind(false, false);
+            //     renderer.shading_framebuffer.bind(false, false);
 
-                renderer.gbuffer_albedo_roughness.bind(0);
-                renderer.gbuffer_normal_metal.bind(1);
-                renderer.depth_texture.bind(2);
-                scene->bind_buffer_pl();
+            //     renderer.gbuffer_albedo_roughness.bind(0);
+            //     renderer.gbuffer_normal_metal.bind(1);
+            //     renderer.depth_texture.bind(2);
+            //     scene->bind_buffer_pl();
 
-                renderer.point_light_material.bind();
-                draw_full_screen_triangle();
+            //     renderer.point_light_material.bind();
+            //     draw_full_screen_triangle();
 
-                glDepthMask(GL_TRUE);
-                glDisable(GL_BLEND);
-                glEnable(GL_CULL_FACE);
-                glCullFace(GL_BACK);
+            //     glDepthMask(GL_TRUE);
+            //     glDisable(GL_BLEND);
+            //     glEnable(GL_CULL_FACE);
+            //     glCullFace(GL_BACK);
 
-                glPopDebugGroup();
-            }
+            //     glPopDebugGroup();
+            // }
 
             // Apply a tonemap as a full screen pass
             {

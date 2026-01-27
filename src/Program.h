@@ -51,6 +51,9 @@ class Program : NonCopyable {
 
         Program(const std::string& frag, const std::string& vert);
         Program(const std::string& comp);
+        Program(const std::string& frag, const std::string& vert,
+                const std::string& tesc, const std::string& tese);
+        
         ~Program();
 
         void bind() const;
@@ -59,7 +62,9 @@ class Program : NonCopyable {
 
         static std::shared_ptr<Program> from_file(const std::string& comp, Span<const std::string> defines = {});
         static std::shared_ptr<Program> from_files(const std::string& frag, const std::string& vert, Span<const std::string> defines = {});
-
+        static std::shared_ptr<Program> from_files(const std::string& frag, const std::string& vert,
+                                                 const std::string& tesc, const std::string& tese,
+                                                 Span<const std::string> defines = {});
         void set_uniform(u32 name_hash, u32 value);
         void set_uniform(u32 name_hash, float value);
         void set_uniform(u32 name_hash, glm::vec2 value);

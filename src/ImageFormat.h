@@ -13,7 +13,9 @@ enum class ImageFormat {
 
     RG16_UNORM,
 
+    R32_FLOAT,
     RGBA16_FLOAT,
+    RGBA32_FLOAT,
     Depth32_FLOAT
 };
 
