@@ -4,18 +4,18 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include <graphics.h>
+#include <Framebuffer.h>
+#include <ImGuiRenderer.h>
 #include <Scene.h>
 #include <Texture.h>
-#include <Framebuffer.h>
 #include <TimestampQuery.h>
-#include <ImGuiRenderer.h>
+#include <graphics.h>
 
 #include <imgui/imgui.h>
 
+#include <filesystem>
 #include <iostream>
 #include <vector>
-#include <filesystem>
 
 using namespace OM3D;
 
@@ -31,24 +31,32 @@ static int gbuffer_debug_mode = 2; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4
 static std::unique_ptr<Scene> scene;
 static std::shared_ptr<Texture> envmap;
 
-namespace OM3D {
-extern bool audit_bindings_before_draw;
+namespace OM3D
+{
+    extern bool audit_bindings_before_draw;
 }
 
-void parse_args(int argc, char** argv) {
-    for(int i = 1; i < argc; ++i) {
+void parse_args(int argc, char** argv)
+{
+    for (int i = 1; i < argc; ++i)
+    {
         const std::string_view arg = argv[i];
 
-        if(arg == "--validate") {
+        if (arg == "--validate")
+        {
             OM3D::audit_bindings_before_draw = true;
-        } else {
+        }
+        else
+        {
             std::cerr << "Unknown argument \"" << arg << "\"" << std::endl;
         }
     }
 }
 
-void glfw_check(bool cond) {
-    if(!cond) {
+void glfw_check(bool cond)
+{
+    if (!cond)
+    {
         const char* err = nullptr;
         glfwGetError(&err);
         std::cerr << "GLFW error: " << err << std::endl;
@@ -56,14 +64,16 @@ void glfw_check(bool cond) {
     }
 }
 
-void update_delta_time() {
+void update_delta_time()
+{
     static double time = 0.0;
     const double new_time = program_time();
     delta_time = float(new_time - time);
     time = new_time;
 }
 
-void process_inputs(GLFWwindow* window, Camera& camera) {
+void process_inputs(GLFWwindow* window, Camera& camera)
+{
     static glm::dvec2 mouse_pos;
 
     glm::dvec2 new_mouse_pos;
@@ -71,42 +81,53 @@ void process_inputs(GLFWwindow* window, Camera& camera) {
 
     {
         glm::vec3 movement = {};
-        if(glfwGetKey(window, 'W') == GLFW_PRESS) {
+        if (glfwGetKey(window, 'W') == GLFW_PRESS)
+        {
             movement += camera.forward();
         }
-        if(glfwGetKey(window, 'S') == GLFW_PRESS) {
+        if (glfwGetKey(window, 'S') == GLFW_PRESS)
+        {
             movement -= camera.forward();
         }
-        if(glfwGetKey(window, 'D') == GLFW_PRESS) {
+        if (glfwGetKey(window, 'D') == GLFW_PRESS)
+        {
             movement += camera.right();
         }
-        if(glfwGetKey(window, 'A') == GLFW_PRESS) {
+        if (glfwGetKey(window, 'A') == GLFW_PRESS)
+        {
             movement -= camera.right();
         }
-        if(glfwGetKey(window, 'E') == GLFW_PRESS) {
+        if (glfwGetKey(window, 'E') == GLFW_PRESS)
+        {
             movement += camera.up();
         }
-        if(glfwGetKey(window, 'Q') == GLFW_PRESS) {
+        if (glfwGetKey(window, 'Q') == GLFW_PRESS)
+        {
             movement -= camera.up();
         }
 
         float speed = 10.0f;
-        if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+        {
             speed *= 10.0f;
         }
 
-        if(movement.length() > 0.0f) {
+        if (movement.length() > 0.0f)
+        {
             const glm::vec3 new_pos = camera.position() + movement * delta_time * speed;
             camera.set_view(glm::lookAt(new_pos, new_pos + camera.forward(), camera.up()));
         }
     }
 
-    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+    {
         const glm::vec2 delta = glm::vec2(mouse_pos - new_mouse_pos) * 0.01f;
-        if(delta.length() > 0.0f) {
+        if (delta.length() > 0.0f)
+        {
             glm::mat4 rot = glm::rotate(glm::mat4(1.0f), delta.x, glm::vec3(0.0f, 1.0f, 0.0f));
             rot = glm::rotate(rot, delta.y, camera.right());
-            camera.set_view(glm::lookAt(camera.position(), camera.position() + (glm::mat3(rot) * camera.forward()), (glm::mat3(rot) * camera.up())));
+            camera.set_view(glm::lookAt(camera.position(), camera.position() + (glm::mat3(rot) * camera.forward()),
+                                        (glm::mat3(rot) * camera.up())));
         }
     }
 
@@ -120,39 +141,51 @@ void process_inputs(GLFWwindow* window, Camera& camera) {
     mouse_pos = new_mouse_pos;
 }
 
-
-void load_envmap(const std::string& filename) {
-    if(auto res = TextureData::from_file(filename); res.is_ok) {
+void load_envmap(const std::string& filename)
+{
+    if (auto res = TextureData::from_file(filename); res.is_ok)
+    {
         envmap = std::make_shared<Texture>(Texture::cubemap_from_equirec(res.value));
         scene->set_envmap(envmap);
-    } else {
+    }
+    else
+    {
         std::cerr << "Unable to load envmap (" << filename << ")" << std::endl;
     }
 }
 
-void load_scene(const std::string& filename) {
-    if(auto res = Scene::from_gltf(filename); res.is_ok) {
+void load_scene(const std::string& filename)
+{
+    if (auto res = Scene::from_gltf(filename); res.is_ok)
+    {
         scene = std::move(res.value);
         scene->set_envmap(envmap);
         scene->set_ibl_intensity(ibl_intensity);
         scene->set_sun(sun_altitude, sun_azimuth, glm::vec3(sun_intensity));
-    } else {
+    }
+    else
+    {
         std::cerr << "Unable to load scene (" << filename << ")" << std::endl;
     }
 }
 
-std::vector<std::string> list_data_files(Span<const std::string> extensions = {}) {
+std::vector<std::string> list_data_files(Span<const std::string> extensions = {})
+{
     std::vector<std::string> files;
-    for(auto&& entry : std::filesystem::directory_iterator(data_path)) {
-        if(entry.status().type() == std::filesystem::file_type::regular) {
+    for (auto&& entry: std::filesystem::directory_iterator(data_path))
+    {
+        if (entry.status().type() == std::filesystem::file_type::regular)
+        {
             const auto ext = entry.path().extension();
 
             bool ext_match = extensions.is_empty();
-            for(const std::string& e : extensions) {
+            for (const std::string& e: extensions)
+            {
                 ext_match |= (ext == e);
             }
 
-            if(ext_match) {
+            if (ext_match)
+            {
                 files.emplace_back(entry.path().string());
             }
         }
@@ -161,17 +194,22 @@ std::vector<std::string> list_data_files(Span<const std::string> extensions = {}
 }
 
 template<typename F>
-bool load_file_window(Span<std::string> files, F&& load_func) {
+bool load_file_window(Span<std::string> files, F&& load_func)
+{
     char buffer[1024] = {};
-    if(ImGui::InputText("Load file", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+    if (ImGui::InputText("Load file", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue))
+    {
         load_func(buffer);
         return true;
     }
 
-    if(!files.is_empty()) {
-        for(const std::string& p : files) {
+    if (!files.is_empty())
+    {
+        for (const std::string& p: files)
+        {
             const auto abs = std::filesystem::absolute(p).string();
-            if(ImGui::MenuItem(abs.c_str())) {
+            if (ImGui::MenuItem(abs.c_str()))
+            {
                 load_func(p);
                 return true;
             }
@@ -181,7 +219,8 @@ bool load_file_window(Span<std::string> files, F&& load_func) {
     return false;
 }
 
-void gui(ImGuiRenderer& imgui) {
+void gui(ImGuiRenderer& imgui)
+{
     const ImVec4 error_text_color = ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
     const ImVec4 warning_text_color = ImVec4(1.0f, 0.8f, 0.4f, 1.0f);
 
@@ -199,18 +238,23 @@ void gui(ImGuiRenderer& imgui) {
 
     bool open_scene_popup = false;
     bool load_envmap_popup = false;
-    if(ImGui::BeginMainMenuBar()) {
-        if(ImGui::BeginMenu("File")) {
-            if(ImGui::MenuItem("Open Scene")) {
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Open Scene"))
+            {
                 open_scene_popup = true;
             }
-            if(ImGui::MenuItem("Open Envmap")) {
+            if (ImGui::MenuItem("Open Envmap"))
+            {
                 load_envmap_popup = true;
             }
             ImGui::EndMenu();
         }
 
-        if(ImGui::BeginMenu("Lighting")) {
+        if (ImGui::BeginMenu("Lighting"))
+        {
             ImGui::DragFloat("Exposure", &exposure, 0.01f, 0.01f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 
             ImGui::Separator();
@@ -228,13 +272,15 @@ void gui(ImGuiRenderer& imgui) {
             ImGui::EndMenu();
         }
 
-        if(scene && ImGui::BeginMenu("Scene Info")) {
+        if (scene && ImGui::BeginMenu("Scene Info"))
+        {
             ImGui::Text("%u objects", u32(scene->objects().size()));
             ImGui::Text("%u point lights", u32(scene->point_lights().size()));
             ImGui::EndMenu();
         }
 
-        if(ImGui::BeginMenu("G-Buffer Debug")) {
+        if (ImGui::BeginMenu("G-Buffer Debug"))
+        {
             ImGui::RadioButton("Depth", &gbuffer_debug_mode, 0);
             ImGui::RadioButton("Normal", &gbuffer_debug_mode, 1);
             ImGui::RadioButton("Albedo", &gbuffer_debug_mode, 2);
@@ -243,7 +289,8 @@ void gui(ImGuiRenderer& imgui) {
             ImGui::EndMenu();
         }
 
-        if(ImGui::MenuItem("GPU Profiler")) {
+        if (ImGui::MenuItem("GPU Profiler"))
+        {
             open_gpu_profiler = true;
         }
 
@@ -258,65 +305,73 @@ void gui(ImGuiRenderer& imgui) {
         ImGui::TextColored(warning_text_color, ICON_FA_BUG " (DEBUG)");
 #endif
 
-        if(!bindless_enabled()) {
+        if (!bindless_enabled())
+        {
             ImGui::Separator();
             ImGui::TextColored(error_text_color, ICON_FA_EXCLAMATION_TRIANGLE " Bindless textures not supported");
         }
         ImGui::EndMainMenuBar();
     }
 
-    if(open_scene_popup) {
+    if (open_scene_popup)
+    {
         ImGui::OpenPopup("###openscenepopup");
 
         const std::array<std::string, 2> extensions = {".gltf", ".glb"};
         load_files = list_data_files(extensions);
     }
 
-    if(ImGui::BeginPopup("###openscenepopup", ImGuiWindowFlags_AlwaysAutoResize)) {
-        if(load_file_window(load_files, load_scene)) {
+    if (ImGui::BeginPopup("###openscenepopup", ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        if (load_file_window(load_files, load_scene))
+        {
             ImGui::CloseCurrentPopup();
         }
 
         ImGui::EndPopup();
     }
 
-    if(load_envmap_popup) {
+    if (load_envmap_popup)
+    {
         ImGui::OpenPopup("###openenvmappopup");
 
         const std::array<std::string, 3> extensions = {".png", ".jpg", ".tga"};
         load_files = list_data_files(extensions);
     }
 
-    if(ImGui::BeginPopup("###openenvmappopup", ImGuiWindowFlags_AlwaysAutoResize)) {
-        if(load_file_window(load_files, load_envmap)) {
+    if (ImGui::BeginPopup("###openenvmappopup", ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        if (load_file_window(load_files, load_envmap))
+        {
             ImGui::CloseCurrentPopup();
         }
 
         ImGui::EndPopup();
     }
 
-    if(open_gpu_profiler) {
-        if(ImGui::Begin(ICON_FA_CLOCK " GPU Profiler")) {
-            const ImGuiTableFlags table_flags =
-                ImGuiTableFlags_SortTristate |
-                ImGuiTableFlags_NoSavedSettings |
-                ImGuiTableFlags_SizingFixedFit |
-                ImGuiTableFlags_BordersInnerV |
-                ImGuiTableFlags_Resizable |
-                ImGuiTableFlags_RowBg;
+    if (open_gpu_profiler)
+    {
+        if (ImGui::Begin(ICON_FA_CLOCK " GPU Profiler"))
+        {
+            const ImGuiTableFlags table_flags = ImGuiTableFlags_SortTristate | ImGuiTableFlags_NoSavedSettings |
+                                                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV |
+                                                ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg;
 
             ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, ImVec4(1, 1, 1, 0.01f));
             DEFER(ImGui::PopStyleColor());
 
-            if(ImGui::BeginTable("##timetable", 3, table_flags)) {
+            if (ImGui::BeginTable("##timetable", 3, table_flags))
+            {
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableSetupColumn("CPU (ms)", ImGuiTableColumnFlags_NoResize, 70.0f);
                 ImGui::TableSetupColumn("GPU (ms)", ImGuiTableColumnFlags_NoResize, 70.0f);
                 ImGui::TableHeadersRow();
 
                 std::vector<u32> indents;
-                for(const auto& zone : retrieve_profile()) {
-                    auto color_from_time = [](float time) {
+                for (const auto& zone: retrieve_profile())
+                {
+                    auto color_from_time = [](float time)
+                    {
                         const float t = std::min(time / 0.008f, 1.0f); // 8ms = red
                         return ImVec4(t, 1.0f - t, 0.0f, 1.0f);
                     };
@@ -335,12 +390,14 @@ void gui(ImGuiRenderer& imgui) {
 
                     ImGui::PopStyleColor(2);
 
-                    if(!indents.empty() && --indents.back() == 0) {
+                    if (!indents.empty() && --indents.back() == 0)
+                    {
                         indents.pop_back();
                         ImGui::Unindent();
                     }
 
-                    if(zone.contained_zones) {
+                    if (zone.contained_zones)
+                    {
                         indents.push_back(zone.contained_zones);
                         ImGui::Indent();
                     }
@@ -354,9 +411,8 @@ void gui(ImGuiRenderer& imgui) {
 }
 
 
-
-
-void load_default_scene() {
+void load_default_scene()
+{
     load_scene(std::string(data_path) + "DamagedHelmet.glb");
     load_envmap(std::string(data_path) + "pretoria_gardens.jpg");
 
@@ -377,8 +433,10 @@ void load_default_scene() {
     }
 }
 
-struct RendererState {
-    static RendererState create(glm::uvec2 size) {
+struct RendererState
+{
+    static RendererState create(glm::uvec2 size)
+    {
         RendererState state;
 
         state.size = size;
@@ -404,10 +462,8 @@ struct RendererState {
 
             state.gbuffer_albedo_roughness = Texture(size, ImageFormat::RGBA8_sRGB, WrapMode::Clamp);
             state.gbuffer_normal_metal = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
-            state.gbuffer_framebuffer = Framebuffer(&state.depth_texture, std::array{
-                &state.gbuffer_albedo_roughness,
-                &state.gbuffer_normal_metal
-            });
+            state.gbuffer_framebuffer = Framebuffer(
+                    &state.depth_texture, std::array{&state.gbuffer_albedo_roughness, &state.gbuffer_normal_metal});
             state.gbuffer_debug_output = Texture(size, ImageFormat::RGBA8_UNORM, WrapMode::Clamp);
             state.gbuffer_debug_framebuffer = Framebuffer(nullptr, std::array{&state.gbuffer_debug_output});
             state.gbuffer_debug_program = Program::from_files("gbuffer_debug.frag", "screen.vert");
@@ -422,7 +478,7 @@ struct RendererState {
             state.shadow_framebuffer = Framebuffer(&state.shadow_depth_texture);
             state.shadow_program = Program::from_files("shadow.frag", "shadow.vert");
 
-            state.scene_shading_program = Program::from_files("scene.frag", "screen.vert");  // Without IBL
+            state.scene_shading_program = Program::from_files("scene.frag", "screen.vert"); // Without IBL
             state.pl_shading_program = Program::from_files("pl.frag", "screen.vert");
             state.point_light_material = Material::point_light_material();
             
@@ -470,9 +526,14 @@ struct RendererState {
     std::shared_ptr<Program> heightmap_program;
 };
 
-
-int main(int argc, char** argv) {
-    DEBUG_ASSERT([] { std::cout << "Debug asserts enabled" << std::endl; return true; }());
+int main(int argc, char** argv)
+{
+    DEBUG_ASSERT(
+            []
+            {
+                std::cout << "Debug asserts enabled" << std::endl;
+                return true;
+            }());
 
     parse_args(argc, argv);
 
@@ -499,9 +560,11 @@ int main(int argc, char** argv) {
     auto tonemap_program = Program::from_files("tonemap.frag", "screen.vert");
     RendererState renderer;
 
-    for(;;) {
+    for (;;)
+    {
         glfwPollEvents();
-        if(glfwWindowShouldClose(window) || glfwGetKey(window, GLFW_KEY_ESCAPE)) {
+        if (glfwWindowShouldClose(window) || glfwGetKey(window, GLFW_KEY_ESCAPE))
+        {
             break;
         }
 
@@ -512,7 +575,8 @@ int main(int argc, char** argv) {
             int height = 0;
             glfwGetWindowSize(window, &width, &height);
 
-            if(renderer.size != glm::uvec2(width, height)) {
+            if (renderer.size != glm::uvec2(width, height))
+            {
                 renderer = RendererState::create(glm::uvec2(width, height));
                 // Execute compute shader
                 const glm::uvec2 workgroup_size = renderer.heightmap_texture.size();
@@ -523,7 +587,8 @@ int main(int argc, char** argv) {
 
         update_delta_time();
 
-        if(const auto& io = ImGui::GetIO(); !io.WantCaptureMouse && !io.WantCaptureKeyboard) {
+        if (const auto& io = ImGui::GetIO(); !io.WantCaptureMouse && !io.WantCaptureKeyboard)
+        {
             process_inputs(window, scene->camera());
         }
 
@@ -555,7 +620,8 @@ int main(int argc, char** argv) {
 
                 const float alt = glm::radians(sun_altitude);
                 const float azi = glm::radians(sun_azimuth);
-                const glm::vec3 light_dir = glm::normalize(glm::vec3(sin(azi) * cos(alt), sin(alt), cos(azi) * cos(alt)));
+                const glm::vec3 light_dir =
+                        glm::normalize(glm::vec3(sin(azi) * cos(alt), sin(alt), cos(azi) * cos(alt)));
 
                 const glm::vec3 scene_center = glm::vec3(0.0f);
                 const glm::vec3 light_pos = scene_center - light_dir * sun_altitude;
@@ -585,7 +651,8 @@ int main(int argc, char** argv) {
 
                 renderer.shadow_program->bind();
                 renderer.shadow_program->set_uniform(HASH("lightSpaceMatrix"), light_space);
-                for(const SceneObject& obj : scene->objects()) {
+                for (const SceneObject& obj: scene->objects())
+                {
                     obj.render_depth_only(*renderer.shadow_program);
                 }
 
@@ -615,19 +682,20 @@ int main(int argc, char** argv) {
                 renderer.gbuffer_debug_framebuffer.bind(false, true);
                 renderer.gbuffer_debug_program->bind();
                 renderer.gbuffer_debug_program->set_uniform(HASH("debug_mode"), u32(gbuffer_debug_mode));
-                
+
                 renderer.gbuffer_albedo_roughness.bind(0);
                 renderer.gbuffer_normal_metal.bind(1);
                 renderer.depth_texture.bind(2);
-                
+
                 draw_full_screen_triangle();
 
                 glPopDebugGroup();
             }
 
-            */{
-                PROFILE_GPU("Shading Pass");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Shading Pass");
+            */
+            {
+                PROFILE_GPU("Scene Shading Pass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Scene Shading Pass");
 
                 glDisable(GL_BLEND);
                 glDisable(GL_DEPTH_TEST);
@@ -641,26 +709,26 @@ int main(int argc, char** argv) {
                 renderer.gbuffer_normal_metal.bind(1);
                 renderer.depth_texture.bind(2);
                 scene->bind_buffer();
-                
+
                 draw_full_screen_triangle();
 
                 glPopDebugGroup();
             }
 
             {
-                PROFILE_GPU("Point Lights Pass");
-                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Point Lights Pass");
+                PROFILE_GPU("Point Lights Shading Pass");
+                glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Point Lights Shading Pass");
 
                 renderer.shading_framebuffer.bind(false, false);
-                
+
                 renderer.gbuffer_albedo_roughness.bind(0);
                 renderer.gbuffer_normal_metal.bind(1);
                 renderer.depth_texture.bind(2);
                 scene->bind_buffer_pl();
-                
+
                 renderer.point_light_material.bind();
                 draw_full_screen_triangle();
-                
+
                 glDepthMask(GL_TRUE);
                 glDisable(GL_BLEND);
                 glEnable(GL_CULL_FACE);
@@ -669,7 +737,7 @@ int main(int argc, char** argv) {
                 glPopDebugGroup();
             }
 
-            //Apply a tonemap as a full screen pass
+            // Apply a tonemap as a full screen pass
             {
                 PROFILE_GPU("Tonemap");
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Tonemap");
@@ -689,7 +757,7 @@ int main(int argc, char** argv) {
                 glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, "Blit");
 
                 blit_to_screen(renderer.tone_mapped_texture);
-                
+
                 glPopDebugGroup();
             }
 
