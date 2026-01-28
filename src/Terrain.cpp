@@ -65,9 +65,9 @@ namespace OM3D
         program.set_uniform(HASH("u_terrain_size"), _size);
         program.set_uniform(HASH("u_height_scale"), _height_scale);
         program.set_uniform(HASH("u_max_dist"), _size * 2.0f);
-        program.set_uniform(HASH("u_tess_level_factor"), 1.0f);
         program.set_uniform(HASH("u_model"), glm::mat4(1.0f));
         program.set_uniform(HASH("u_frustum"), camera.build_frustum());
+        program.set_uniform(HASH("u_tesselation_factor"), _tesselation_factor);
     }
 
     void Terrain::render(Program& program, const Camera& camera) const

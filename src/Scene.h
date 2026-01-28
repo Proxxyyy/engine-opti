@@ -26,6 +26,7 @@ namespace OM3D
         void render() const;
 
         void add_object(SceneObject obj);
+        void clear_object() { _objects.clear(); }
         void add_light(PointLight obj);
 
         Span<const SceneObject> objects() const;

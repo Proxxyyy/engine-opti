@@ -33,6 +33,7 @@ namespace OM3D
         const Texture& heightmap() const { return *_heightmap; }
         float size() const { return _size; }
         float height_scale() const { return _height_scale; }
+        void set_tesselation_factor(float factor) { _tesselation_factor = factor; }
 
     private:
         void generate_grid_mesh(u32 grid_size);
@@ -40,6 +41,7 @@ namespace OM3D
 
         std::shared_ptr<Texture> _heightmap;
         std::shared_ptr<Program> _compute_program;
+        float _tesselation_factor = 4.0f;
 
         // Terrain material textures
         std::shared_ptr<Texture> _grass_albedo;

@@ -27,6 +27,7 @@ static float sun_azimuth = 45.0f;
 static float sun_intensity = 7.0f;
 static float ibl_intensity = 1.0f;
 static float exposure = 0.33f;
+static float tesselation_factor = 4.0f;
 static int gbuffer_debug_mode = 2; // 0=depth, 1=normal, 2=albedo, 3=metallic, 4=roughness
 
 static std::unique_ptr<Scene> scene;
@@ -273,7 +274,12 @@ void gui(ImGuiRenderer& imgui)
 
             ImGui::EndMenu();
         }
-
+        if (ImGui::BeginMenu("Terrain"))
+        {
+            ImGui::DragFloat("Tesselation Factor", &tesselation_factor, 0.1f, 1.0f, 64.0f);
+            terrain->set_tesselation_factor(tesselation_factor);
+            ImGui::EndMenu();
+        }
         if (scene && ImGui::BeginMenu("Scene Info"))
         {
             ImGui::Text("%u objects", u32(scene->objects().size()));
@@ -567,6 +573,7 @@ int main(int argc, char** argv)
 
 
     load_default_scene();
+    scene->clear_object();
 
 
     terrain = std::make_unique<Terrain>();
@@ -595,6 +602,7 @@ int main(int argc, char** argv)
                 renderer = RendererState::create(glm::uvec2(width, height));
                 terrain->init(renderer.heightmap_program, renderer.heightmap_texture);
             }
+            
         }
 
         update_delta_time();

@@ -106,13 +106,12 @@ namespace OM3D
         // Render every object
         {
             // Opaque first
+            Frustum frustum = _camera.build_frustum();
             for (const SceneObject& obj: _objects)
             {
                 if (obj.material().is_opaque())
                 {
                     // Check frustum culling
-                    Frustum frustum = _camera.build_frustum();
-
                     const BoundingSphere bs = obj.mesh()->bounding_sphere();
                     glm::vec3 bsWS = obj.transform() * glm::vec4(bs.center, 1.0f);
 
@@ -154,8 +153,6 @@ namespace OM3D
                 if (!obj.material().is_opaque())
                 {
                     // Check frustum culling
-                    Frustum frustum = _camera.build_frustum();
-
                     const BoundingSphere bs = obj.mesh()->bounding_sphere();
                     glm::vec3 bsWS = obj.transform() * glm::vec4(bs.center, 1.0f);
 

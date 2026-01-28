@@ -14,7 +14,7 @@ uniform mat4 u_view_proj;
 uniform mat4 u_model;
 uniform mat4 u_model_view;
 uniform vec3 u_camera_pos;
-uniform float u_tess_level_factor; // Global multiplier
+uniform float u_tesselation_factor;
 uniform float u_max_dist;
 
 uniform Frustum u_frustum;
@@ -26,7 +26,7 @@ void main() {
     if (gl_InvocationID == 0)
     {
         // Adaptive tessellation based on camera distance
-        const int MIN_TESS_LEVEL = 4;
+        const float MIN_TESS_LEVEL = u_tesselation_factor;
         const int MAX_TESS_LEVEL = 64;
         const float MIN_DISTANCE = 50.0;
         const float MAX_DISTANCE = 400.0;
