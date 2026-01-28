@@ -29,8 +29,8 @@ void main() {
         const int MIN_TESS_LEVEL = 4;
         const int MAX_TESS_LEVEL = 64;
         const float MIN_DISTANCE = 50.0;
-        const float MAX_DISTANCE = 300.0;
-        const float CULL_DISTANCE = 400.0;  // Distance beyond which patches are discarded
+        const float MAX_DISTANCE = 400.0;
+        const float CULL_DISTANCE = 500.0;  // Distance beyond which patches are discarded
 
         // Transform vertices to eye space
         vec4 eyePos00 = u_model_view * gl_in[0].gl_Position;
