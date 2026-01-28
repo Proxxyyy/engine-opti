@@ -6,38 +6,16 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "Camera.h"
+#include <filesystem>
+#include <functional>
 
 namespace OM3D
 {
 
-    static std::string read_shader(const std::string& file_name, Span<const std::string> defines = {})
+    namespace fs = std::filesystem;
+
+    static std::string preprocess_shader(std::string shader, const fs::path& current_path, std::unordered_set<std::string>& visited_includes, const std::function<std::string()>& add_defines)
     {
-        const std::string full_path = std::string(shader_path) + file_name;
-
-        auto content = read_text_file(full_path);
-        if (!content.is_ok)
-        {
-            FATAL((std::string("Unable to read shader: \"") + full_path + '"').c_str());
-        }
-
-        bool define_added = false;
-        auto add_defines = [&]()
-        {
-            if (define_added || defines.is_empty())
-            {
-                return std::string();
-            }
-            define_added = true;
-            std::string defs = "\n";
-            for (const std::string& def: defines)
-            {
-                defs += "#define " + def + " 1\n";
-            }
-            return defs;
-        };
-
-        std::string shader(std::move(content.value));
-        std::unordered_set<std::string> includes;
         for (size_t i = 0; i < shader.size();)
         {
             const auto endl = shader.find('\n', i);
@@ -81,18 +59,35 @@ namespace OM3D
                         }
 
                         const std::string include_file(line.substr(1, end - 1));
-                        std::string include_content = add_defines();
-                        if (includes.find(include_file) == includes.end())
+                        
+                        // Resolve path
+                        fs::path next_file = current_path.parent_path() / include_file;
+                        if(!fs::exists(next_file)) {
+                             next_file = fs::path(std::string(shader_path)) / include_file;
+                        }
+
+                        std::string include_string = next_file.string();
+                        std::error_code ec;
+                        fs::path canonical_path = fs::canonical(next_file, ec);
+                        if(!ec) include_string = canonical_path.string();
+                        
+                        std::string include_content;
+
+                        if (visited_includes.find(include_string) == visited_includes.end())
                         {
-                            includes.insert(include_file);
-                            auto content = read_text_file(std::string(shader_path) + include_file);
+                            visited_includes.insert(include_string);
+                            auto content = read_text_file(include_string);
                             if (!content.is_ok)
                             {
                                 FATAL((std::string("Shader include not found: \"") + std::string(full_line) + '"')
                                               .c_str());
                             }
-                            include_content = std::move(content.value);
+                            
+                            // Recursive call
+                            include_content = preprocess_shader(std::move(content.value), next_file, visited_includes, add_defines);
                         }
+                        
+                        include_content = add_defines() + include_content;
 
                         shader = shader.substr(0, i) + include_content + shader.substr(endl);
                         continue;
@@ -102,8 +97,42 @@ namespace OM3D
 
             i = endl + 1;
         }
-
         return shader;
+    }
+
+    static std::string read_shader(const std::string& file_name, Span<const std::string> defines = {})
+    {
+         const std::string full_path_str = std::string(shader_path) + file_name;
+         fs::path full_path(full_path_str);
+         
+         auto content = read_text_file(full_path_str);
+         if(!content.is_ok)
+         {
+            FATAL((std::string("Unable to read shader: \"") + full_path_str + '"').c_str());
+         }
+         
+         bool define_added = false;
+         std::function<std::string()> add_defines = [&]() -> std::string {
+            if (define_added || defines.is_empty())
+            {
+                return std::string();
+            }
+            define_added = true;
+            std::string defs = "\n";
+            for (const std::string& def: defines)
+            {
+                defs += "#define " + def + " 1\n";
+            }
+            return defs;
+         };
+
+         std::unordered_set<std::string> visited;
+         std::error_code ec;
+         fs::path canonical_path = fs::canonical(full_path, ec);
+         if(!ec) visited.insert(canonical_path.string());
+         else visited.insert(full_path.string());
+
+         return preprocess_shader(std::move(content.value), full_path, visited, add_defines);
     }
 
     static GLuint create_shader(const std::string& src, GLenum type)

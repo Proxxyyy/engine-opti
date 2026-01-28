@@ -19,22 +19,22 @@ void main() {
     vec2 uv = te_position.xz * 0.8;
     float h = te_position.y;
     // vec3 normal = normalize(out_normal);
-    if (h > 28.0) {
+    if (h > 34.0) {
         out_color = texture(u_snow_albedo, uv).xyz;
         // normal = texture(snow_nm_text, uv).xyz;
     }
-    else if (h > 22.0) {
-        float t = (h - 22.0) / 6.0;
+    else if (h > 25.0) {
+        float t = (h - 25.0) / 9.0;
         out_color = mix(texture(u_rocks_albedo, uv).xyz, texture(u_snow_albedo, uv).xyz, t);
         // normal = mix(texture(rock_nm_text, uv).xyz, texture(snow_nm_text, uv).xyz, t);
     }
-    else if (h > 10.0) {
-        float t = (h - 10.0) / 12.0;
+    else if (h > 13.0) {
+        float t = (h - 13.0) / 12.0;
         out_color = mix(texture(u_forest_albedo, uv).xyz, texture(u_rocks_albedo, uv).xyz, t);
         // normal = mix(texture(forest_nm_text, uv).xyz, texture(rock_nm_text, uv).xyz, t);
     }
-    else if (h > 4.0) {
-        float t = (h - 4.0) / 6.0;
+    else if (h > 8.0) {
+        float t = (h - 8.0) / 5.0;
         out_color = mix(texture(u_grass_albedo, uv).xyz, texture(u_forest_albedo, uv).xyz, t);
         // normal = mix(texture(grass_nm_text, uv).xyz, texture(forest_nm_text, uv).xyz, t);
     }

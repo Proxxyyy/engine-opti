@@ -15,6 +15,8 @@ endif()
 add_subdirectory(external/glfw)
 add_subdirectory(external/glm)
 
+include_directories(external/lygia/math)
+include_directories(external/lygia/generative)
 include_directories(external/glfw/include)
 include_directories(external/glad/include)
 include_directories(external/glm)
@@ -42,6 +44,8 @@ file(GLOB_RECURSE SHADER_FILES
     "shaders/*.geom"
     "shaders/*.comp"
     "shaders/*.glsl"
+    "external/lygia/generative/*.glsl"
+    "external/lygia/generative/math/*.glsl"
 )
 
 
