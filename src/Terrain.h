@@ -55,8 +55,8 @@ namespace OM3D
 
         // Terrain settings
         float _size = 8192.0f;
-        float _height_scale = 30.0f;
-        float _noise_frequency = 0.1f;
+        float _height_scale = 40.0f;
+        float _noise_frequency = 0.03f;
     };
 
 } // namespace OM3D

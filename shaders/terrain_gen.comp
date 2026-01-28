@@ -16,30 +16,67 @@ float hash12(vec2 p) {
     return fract((p3.x + p3.y) * p3.z);
 }
 
-// 2D Noise
-float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
+// 2D value noise with analytical derivatives
+// Returns vec3(noise_value, derivative_x, derivative_y)
+vec3 noised(vec2 x) {
+    vec2 p = floor(x);
+    vec2 w = fract(x);
 
-    return mix(mix(hash12(i + vec2(0.0, 0.0)),
-                   hash12(i + vec2(1.0, 0.0)), u.x),
-               mix(hash12(i + vec2(0.0, 1.0)),
-                   hash12(i + vec2(1.0, 1.0)), u.x), u.y);
+    // Quintic interpolation (smoother than cubic)
+    vec2 u = w * w * w * (w * (w * 6.0 - 15.0) + 10.0);
+    vec2 du = 30.0 * w * w * (w * (w - 2.0) + 1.0);
+
+    // Hash values at 4 corners
+    float a = hash12(p + vec2(0.0, 0.0));
+    float b = hash12(p + vec2(1.0, 0.0));
+    float c = hash12(p + vec2(0.0, 1.0));
+    float d = hash12(p + vec2(1.0, 1.0));
+
+    // Bilinear interpolation coefficients
+    float k0 = a;
+    float k1 = b - a;
+    float k2 = c - a;
+    float k4 = a - b - c + d;
+
+    // Value and derivatives
+    float value = -1.0 + 2.0 * (k0 + k1 * u.x + k2 * u.y + k4 * u.x * u.y);
+    vec2 deriv = 2.0 * du * vec2(k1 + k4 * u.y, k2 + k4 * u.x);
+
+    return vec3(value, deriv);
 }
 
-// Fractal Brownian Motion
-float fbm(vec2 x) {
-    float v = 0.0;
-    float a = 0.5;
-    vec2 shift = vec2(100.0);
-    mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.50));
-    for (int i = 0; i < 5; ++i) {
-        v += a * noise(x);
-        x = rot * x * 2.0 + shift;
-        a *= 0.5;
+// Fractal Brownian Motion with derivative accumulation
+// Returns vec3(height, derivative_x, derivative_y)
+vec3 fbm_deriv(vec2 x, int octaves) {
+    const float f = 1.98;  // frequency multiplier (could be 2.0)
+    const float s = 0.45;  // amplitude multiplier (could be 0.5)
+
+    // Rotation matrix to reduce grid-aligned artifacts
+    const float angle = 0.5;  // radians
+    const mat2 m2 = mat2(cos(angle), sin(angle), -sin(angle), cos(angle));
+    // Inverse rotation for derivative transformation
+    const mat2 m2i = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+
+    float a = 0.0;           // accumulated value
+    float b = 0.5;           // amplitude
+    vec2 d = vec2(0.0);      // accumulated derivatives
+    mat2 m = mat2(1.0, 0.0, 0.0, 1.0);  // derivative transform matrix
+
+    for (int i = 0; i < octaves; i++) {
+        vec3 n = noised(x);
+        a += b * n.x;              // accumulate value
+        d += b * m * n.yz;         // accumulate derivatives (transformed)
+        b *= s;                    // reduce amplitude
+        x = f * m2 * x;            // rotate and scale coordinates
+        m = f * m2i * m;           // update derivative transform
     }
-    return v;
+
+    return vec3(a, d);
+}
+
+// Simple fbm (returns height only, for backwards compatibility)
+float fbm(vec2 x) {
+    return fbm_deriv(x, 5).x;
 }
 
 void main() {
@@ -57,8 +94,25 @@ void main() {
     // u_scale is "how many meters does the heightmap cover"
     vec2 world_pos = u_camera_pos + uv * u_scale;
 
-    // Generate height
-    float height = fbm(world_pos * u_noise_freq_scale) * u_height_scale;
+    // Domain warping for more organic terrain
+    vec2 pos = world_pos * u_noise_freq_scale;
+    
+    // First pass: get noise + derivatives for warping
+    vec3 n1 = fbm_deriv(pos, 4);
+    
+    // Warp coordinates using derivatives (creates ridges and valleys)
+    float warp_strength = 0.2;
+    vec2 warped_pos = pos + n1.yz * warp_strength;
+    
+    // Second pass: sample at warped position
+    vec3 n2 = fbm_deriv(warped_pos, 5);
+    
+    // Optional: second warp for even more complex terrain
+    vec2 double_warped = warped_pos + n2.yz * warp_strength * 0.5;
+    float final_noise = fbm_deriv(double_warped, 4).x;
+    
+    // Combine layers with different weights
+    float height = (n1.x * 0.5 + n2.x * 0.35 + final_noise * 0.25) * u_height_scale;
 
     imageStore(u_heightmap, texel, vec4(height, 0.0, 0.0, 1.0));
 }
