@@ -416,7 +416,7 @@ void gui(ImGuiRenderer& imgui)
 void load_default_scene()
 {
     load_scene(std::string(data_path) + "DamagedHelmet.glb");
-    load_envmap(std::string(data_path) + "pretoria_gardens.jpg");
+    load_envmap(std::string(data_path) + "skybox_clouds.jpg");
 
     // Add lights
     {

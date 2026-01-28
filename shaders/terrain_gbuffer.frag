@@ -23,18 +23,18 @@ void main() {
         out_color = texture(u_snow_albedo, uv).xyz;
         // normal = texture(snow_nm_text, uv).xyz;
     }
-    else if (h > 24.0) {
-        float t = (h - 24.0) / 4.0;
+    else if (h > 22.0) {
+        float t = (h - 22.0) / 6.0;
         out_color = mix(texture(u_rocks_albedo, uv).xyz, texture(u_snow_albedo, uv).xyz, t);
         // normal = mix(texture(rock_nm_text, uv).xyz, texture(snow_nm_text, uv).xyz, t);
     }
-    else if (h > 20.0) {
-        float t = (h - 20.0) / 4.0;
+    else if (h > 15.0) {
+        float t = (h - 15.0) / 7.0;
         out_color = mix(texture(u_forest_albedo, uv).xyz, texture(u_rocks_albedo, uv).xyz, t);
         // normal = mix(texture(forest_nm_text, uv).xyz, texture(rock_nm_text, uv).xyz, t);
     }
-    else if (h > 16.0) {
-        float t = (h - 16.0) / 4.0;
+    else if (h > 4.0) {
+        float t = (h - 4.0) / 11.0;
         out_color = mix(texture(u_grass_albedo, uv).xyz, texture(u_forest_albedo, uv).xyz, t);
         // normal = mix(texture(grass_nm_text, uv).xyz, texture(forest_nm_text, uv).xyz, t);
     }
