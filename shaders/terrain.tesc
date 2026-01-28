@@ -1,5 +1,8 @@
 #version 450
 
+#include "structs.glsl"
+#include "utils.glsl"
+
 layout(vertices = 4) out;
 
 in vec3 v_position[];
@@ -13,6 +16,8 @@ uniform mat4 u_model_view;
 uniform vec3 u_camera_pos;
 uniform float u_tess_level_factor; // Global multiplier
 uniform float u_max_dist;
+
+uniform Frustum u_frustum;
 
 void main() {
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
@@ -39,10 +44,18 @@ void main() {
         float dist10 = length(eyePos10.xyz);
         float dist11 = length(eyePos11.xyz);
 
-        // Distance culling: if ALL vertices are beyond cull distance, discard the patch
+        // Frustum culling: check if all 4 corners are outside the frustum
+        vec3 corner00 = (u_model * gl_in[0].gl_Position).xyz;
+        vec3 corner01 = (u_model * gl_in[1].gl_Position).xyz;
+        vec3 corner10 = (u_model * gl_in[2].gl_Position).xyz;
+        vec3 corner11 = (u_model * gl_in[3].gl_Position).xyz;
+
+        bool culled00 = is_frustum_culled(u_frustum, corner00, u_camera_pos);
+        bool culled01 = is_frustum_culled(u_frustum, corner01, u_camera_pos);
+        bool culled10 = is_frustum_culled(u_frustum, corner10, u_camera_pos);
+        bool culled11 = is_frustum_culled(u_frustum, corner11, u_camera_pos);
         float minDist = min(min(dist00, dist01), min(dist10, dist11));
-        if (minDist > CULL_DISTANCE) {
-            // Discard patch entirely by setting tessellation to 0
+        if (minDist > CULL_DISTANCE || (culled00 && culled01 && culled10 && culled11)) {
             gl_TessLevelOuter[0] = 0.0;
             gl_TessLevelOuter[1] = 0.0;
             gl_TessLevelOuter[2] = 0.0;
@@ -51,6 +64,8 @@ void main() {
             gl_TessLevelInner[1] = 0.0;
             return;
         }
+
+        
 
         // Calculate smooth tessellation falloff using smoothstep
         // smoothstep(edge0, edge1, x) smoothly interpolates from 0 to 1 as x goes from edge0 to edge1

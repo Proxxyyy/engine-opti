@@ -24,3 +24,16 @@ struct PointLight {
     float padding;
 };
 
+
+struct Frustum {
+    vec3 near_normal;
+    float padding0; // to align to 16 bytes
+    vec3 top_normal;
+    float padding1;
+    vec3 bottom_normal;
+    float padding2;
+    vec3 right_normal;
+    float padding3;
+    vec3 left_normal;
+    float padding4;
+};

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
+#include "Camera.h"
 
 namespace OM3D
 {
@@ -390,6 +391,21 @@ namespace OM3D
     void Program::set_uniform(u32 name_hash, const UniformValue& value)
     {
         std::visit([name_hash, this](const auto& v) { set_uniform(name_hash, v); }, value);
+    }
+
+    void Program::set_uniform(u32 name_hash, Frustum value)
+    {
+        // Set each vec3 component of the Frustum struct
+        // GLSL struct members: near_normal, top_normal, bottom_normal, right_normal, left_normal
+        if (const int loc = find_location(name_hash); loc >= 0)
+        {
+            // Offset into the uniform buffer: each vec3 + padding = 16 bytes (vec4-aligned)
+            glProgramUniform3f(_handle.get(), loc + 0, value._near_normal.x, value._near_normal.y, value._near_normal.z);
+            glProgramUniform3f(_handle.get(), loc + 1, value._top_normal.x, value._top_normal.y, value._top_normal.z);
+            glProgramUniform3f(_handle.get(), loc + 2, value._bottom_normal.x, value._bottom_normal.y, value._bottom_normal.z);
+            glProgramUniform3f(_handle.get(), loc + 3, value._right_normal.x, value._right_normal.y, value._right_normal.z);
+            glProgramUniform3f(_handle.get(), loc + 4, value._left_normal.x, value._left_normal.y, value._left_normal.z);
+        }
     }
 
 } // namespace OM3D

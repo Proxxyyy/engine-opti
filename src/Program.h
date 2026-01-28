@@ -14,6 +14,8 @@
 #include <variant>
 #include <vector>
 
+#include "Camera.h"
+
 namespace OM3D
 {
 
@@ -67,6 +69,7 @@ namespace OM3D
         void set_uniform(u32 name_hash, u64 value);
 
         void set_uniform(u32 name_hash, const UniformValue& value);
+        void set_uniform(u32 name_hash, Frustum value);
 
         template<typename T>
         void set_uniform(std::string_view name, const T& value)

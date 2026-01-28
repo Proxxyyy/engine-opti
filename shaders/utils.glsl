@@ -118,10 +118,13 @@ float geometry_smith(vec3 N, vec3 V, vec3 L, float roughness) {
 }
 
 
-
-
-
-
-
+bool is_frustum_culled(Frustum frustum, vec3 corner, vec3 camera_pos) {
+    if (dot(frustum.near_normal, corner - camera_pos) < 0.0) return true;
+    if (dot(frustum.top_normal, corner - camera_pos) < 0.0) return true;
+    if (dot(frustum.bottom_normal, corner - camera_pos) < 0.0) return true;
+    if (dot(frustum.right_normal, corner - camera_pos) < 0.0) return true;
+    if (dot(frustum.left_normal, corner - camera_pos) < 0.0) return true;
+    return false;
+}
 
 
